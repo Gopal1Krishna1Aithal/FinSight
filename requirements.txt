@@ -5,3 +5,6 @@ groq
 python-dotenv
 tabulate
 SQLAlchemy
+Pillow
+pillow-heif
+google-genai

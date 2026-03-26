@@ -1,5 +1,7 @@
 import os
 import sys
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
 import pandas as pd
 from dotenv import load_dotenv
 
@@ -21,7 +23,7 @@ import argparse
 load_dotenv()
 
 parser = argparse.ArgumentParser(description="Process a business bank statement PDF.")
-parser.add_argument("pdf", nargs="?", default=os.path.join("data", "input", "sample_business_statement.pdf"), help="Path to the PDF statement")
+parser.add_argument("pdf", nargs="?", default=os.path.join("data", "input", "sample_business_statement-1-3.pdf"), help="Path to the PDF statement")
 args = parser.parse_args()
 
 PDF_PATH   = args.pdf
@@ -288,12 +290,31 @@ def run_pipeline() -> None:
     init_db()
 
     # ── Step 1: Extract ──────────────────────────────────────────────────
-    print("\n[1/6] Extracting raw transactions from PDF...")
+    print(f"\n[1/6] Extracting raw transactions from '{PDF_PATH}'...")
     if not os.path.exists(PDF_PATH):
-        print(f"      [!] PDF not found at '{PDF_PATH}'. Aborting.")
+        print(f"      [!] Path not found at '{PDF_PATH}'. Aborting.")
         sys.exit(1)
 
-    raw_data = HDFCPDFExtractor(PDF_PATH).extract()
+    raw_data = None
+    if os.path.isdir(PDF_PATH):
+        # Image OCR Mode
+        valid_extensions = {".jpg", ".jpeg", ".png", ".heic"}
+        image_files = [
+            os.path.join(PDF_PATH, f) for f in os.listdir(PDF_PATH)
+            if os.path.splitext(f.lower())[1] in valid_extensions
+        ]
+        if not image_files:
+            print(f"      [!] No valid image files ({','.join(valid_extensions)}) found in '{PDF_PATH}'. Aborting.")
+            sys.exit(1)
+            
+        print(f"      [OCR] Found {len(image_files)} image files in {PDF_PATH}.")
+        from core.extractors.image_ocr import ImageOCRExtractor
+        extractor = ImageOCRExtractor(image_paths=image_files)
+        raw_data = extractor.extract()
+    else:
+        # Standard PDF Extractor
+        raw_data = HDFCPDFExtractor(PDF_PATH).extract()
+
     if not raw_data:
         print("      [!] Extraction returned no data. Aborting.")
         sys.exit(1)
