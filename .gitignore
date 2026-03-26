@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Data (Don't push your actual bank statements!)
+data/input/
+data/output/
+mapping/cache.json
+
+# IDEs
+.vscode/
+.idea/

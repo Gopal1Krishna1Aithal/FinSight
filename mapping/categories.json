@@ -1,0 +1,77 @@
+{
+  "_metadata": {
+    "version": 1,
+    "description": "Chart of Accounts categories for HDFC business statement classification.",
+    "note": "Add or rename categories here. The CoAMapper loads this file at runtime — no code changes needed."
+  },
+  "categories": [
+    {
+      "name": "Payroll",
+      "description": "Salary credits, payroll payments, advance salary transfers to employees"
+    },
+    {
+      "name": "ATM Withdrawal",
+      "description": "Cash withdrawn from ATMs via ATW, NWD, or EAW transactions"
+    },
+    {
+      "name": "Fuel & Auto",
+      "description": "Petrol, diesel, CNG purchases, automobile parts, vehicle servicing (HP, HPCL, fuel centres, automobile shops)"
+    },
+    {
+      "name": "Healthcare & Medical",
+      "description": "Medical supplies, pharmacy, healthcare product purchases (UKAR HEALTHCARE, medical stores)"
+    },
+    {
+      "name": "Utilities & Telecom",
+      "description": "Mobile recharge, broadband, electricity, gas, water bills (Airtel, PhonePe bill payments, Jio, BSNL)"
+    },
+    {
+      "name": "Software & IT",
+      "description": "SaaS subscriptions, app purchases, digital services, cloud payments"
+    },
+    {
+      "name": "Bank Charges & Fees",
+      "description": "ATM usage fees, non-home branch charges, service charges, GST on banking fees"
+    },
+    {
+      "name": "Credit Card Repayment",
+      "description": "Autopay or manual payments towards credit card dues (CC AUTOPAY, AUTOPAY SI-TAD, AUTOPAY SI-MAD)"
+    },
+    {
+      "name": "Fund Transfer",
+      "description": "Internal transfers between own accounts, FUND TRF DM transactions"
+    },
+    {
+      "name": "UPI & Digital Payment",
+      "description": "Generic UPI transfers, PhonePe, Google Pay, Paytm payments where merchant is unknown"
+    },
+    {
+      "name": "E-Commerce & Retail",
+      "description": "Online shopping — Amazon, Flipkart, Meesho, and other retail purchases"
+    },
+    {
+      "name": "Travel & Transport",
+      "description": "IRCTC train tickets, cab bookings, travel agent payments, Paytm travel"
+    },
+    {
+      "name": "Cash Deposit",
+      "description": "Cash deposited into the account (CD transactions)"
+    },
+    {
+      "name": "Interest & Dividends",
+      "description": "Bank interest credited, dividend income, investment returns"
+    },
+    {
+      "name": "Loan & EMI",
+      "description": "EMI payments, loan repayments, credit line settlements"
+    },
+    {
+      "name": "IMPS Transfer",
+      "description": "IMPS person-to-person or business transfers where payee name is visible"
+    },
+    {
+      "name": "Uncategorized",
+      "description": "Transactions that do not clearly fit any other category"
+    }
+  ]
+}

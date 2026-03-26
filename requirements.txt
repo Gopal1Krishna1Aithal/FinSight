@@ -1,0 +1,6 @@
+pdfplumber
+pandas
+openpyxl
+groq
+python-dotenv
+tabulate
