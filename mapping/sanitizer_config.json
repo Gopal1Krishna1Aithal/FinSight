@@ -1,0 +1,31 @@
+{
+  "_comment": "Account-specific config for DataSanitizer. Edit this — never the code.",
+
+  "salary_prefixes": [
+    "UKARHEALTHCAR"
+  ],
+
+  "boilerplate_phrases": [
+    "PAYMENTFROMPHONEPE",
+    "PAYMENT FROM PHONEPE",
+    "POS DEBIT",
+    "POSDEBIT",
+    "AUTOPAY SI-TAD",
+    "AUTOPAY SI-MAD",
+    "AUTOPAYSI-TAD",
+    "AUTOPAYSI-MAD",
+    "COMMENTS",
+    "IMPSTXN",
+    "IMPS TXN",
+    "ONBEHALFOF",
+    "BENEFICIARYVERIFICATION",
+    "IMPSTRANSACTION"
+  ],
+
+  "merchant_aliases": {
+    "PTM*":             "",
+    "AIP*":             "",
+    "TPS*":             "",
+    "ONE97COMMUNICAT":  "PAYTM"
+  }
+}
