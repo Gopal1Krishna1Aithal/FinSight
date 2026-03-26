@@ -4,3 +4,4 @@ openpyxl
 groq
 python-dotenv
 tabulate
+SQLAlchemy

@@ -8,6 +8,11 @@ from core.processors.cleaner import HDFCDataCleaner
 from core.processors.sanitizer import DataSanitizer
 from core.ai_services.coa_mapper import CoAMapper, CONFIDENCE_THRESHOLD
 
+from core.db.session import init_db
+from core.db.operations import upsert_transactions
+from core.ai_services.insights_generator import InsightsGenerator
+import argparse
+
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -15,10 +20,15 @@ from core.ai_services.coa_mapper import CoAMapper, CONFIDENCE_THRESHOLD
 
 load_dotenv()
 
-PDF_PATH   = os.path.join("data", "input", "sample_business_statement.pdf")
+parser = argparse.ArgumentParser(description="Process a business bank statement PDF.")
+parser.add_argument("pdf", nargs="?", default=os.path.join("data", "input", "sample_business_statement.pdf"), help="Path to the PDF statement")
+args = parser.parse_args()
+
+PDF_PATH   = args.pdf
 OUT_DIR    = os.path.join("data", "output")
 EXCEL_PATH = os.path.join(OUT_DIR, "clean_statement.xlsx")
 TALLY_PATH = os.path.join(OUT_DIR, "tally_import.csv")
+INSIGHTS_PATH = os.path.join(OUT_DIR, "financial_insights.md")
 
 
 # ---------------------------------------------------------------------------
@@ -274,8 +284,11 @@ def _save_tally_csv(df: pd.DataFrame, path: str) -> None:
 def run_pipeline() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
 
+    print("\n[0/6] Initializing database...")
+    init_db()
+
     # ── Step 1: Extract ──────────────────────────────────────────────────
-    print("\n[1/5] Extracting raw transactions from PDF...")
+    print("\n[1/6] Extracting raw transactions from PDF...")
     if not os.path.exists(PDF_PATH):
         print(f"      [!] PDF not found at '{PDF_PATH}'. Aborting.")
         sys.exit(1)
@@ -287,26 +300,26 @@ def run_pipeline() -> None:
     print(f"      → {len(raw_data)} rows extracted.")
 
     # ── Step 2: Clean ────────────────────────────────────────────────────
-    print("\n[2/5] Cleaning narrations and coercing numbers...")
+    print("\n[2/6] Cleaning narrations and coercing numbers...")
     clean_df = HDFCDataCleaner(raw_data).clean()
     print(f"      → {len(clean_df)} rows | null dates: {clean_df['Date'].isna().sum()}")
 
     # ── Step 3: Validate ─────────────────────────────────────────────────
-    print("\n[3/5] Validating balance integrity...")
+    print("\n[3/6] Validating balance integrity...")
     if not validate_balances(clean_df):
         print("\n      [!] Validation FAILED — fix extraction before proceeding.")
         sys.exit(1)
     print(f"      → All {len(clean_df)} balances verified ✅")
 
     # ── Step 4: Scrub PII ────────────────────────────────────────────────
-    print("\n[4/5] Scrubbing PII and building Clean_Description...")
+    print("\n[4/6] Scrubbing PII and building Clean_Description...")
     safe_df = DataSanitizer(clean_df).scrub_pii()
     sample  = safe_df[["Narration", "Clean_Description"]].drop_duplicates().head(5)
     for _, row in sample.iterrows():
         print(f"      {row['Narration'][:42]:<42}  →  {row['Clean_Description']}")
 
     # ── Step 4.5: CoA Categorisation + Confidence Scoring ────────────────
-    print("\n[4.5/5] Categorising via Groq LLM (with confidence scoring)...")
+    print("\n[4.5/6] Categorising via Groq LLM (with confidence scoring)...")
     groq_api_key = os.getenv("GROQ_API_KEY")
 
     if not groq_api_key:
@@ -322,9 +335,20 @@ def run_pipeline() -> None:
         safe_df = mapper.map(safe_df)
 
     # ── Step 5: Save outputs ─────────────────────────────────────────────
-    print("\n[5/5] Writing output files...")
+    print("\n[5/6] Writing output files and updating database...")
     _save_excel(safe_df, EXCEL_PATH)
     _save_tally_csv(safe_df, TALLY_PATH)
+
+    new_rows = upsert_transactions(safe_df)
+    print(f"      ✅  Database → Inserted {new_rows} new transactions.")
+
+    # ── Step 6: Generate Insights ────────────────────────────────────────
+    print("\n[6/6] Generating financial insights from full history...")
+    try:
+        generator = InsightsGenerator()
+        generator.generate_insights(INSIGHTS_PATH)
+    except Exception as e:
+        print(f"      [Insights] Initialization failed: {e}")
 
     # ── Terminal summary ─────────────────────────────────────────────────
     review_count = int(
