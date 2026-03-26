@@ -6,14 +6,14 @@ from dotenv import load_dotenv
 from core.extractors.hdfc_pdf import HDFCPDFExtractor
 from core.processors.cleaner import HDFCDataCleaner
 from core.processors.sanitizer import DataSanitizer
-from core.ai_services.coa_mapper import CoAMapper
+from core.ai_services.coa_mapper import CoAMapper, CONFIDENCE_THRESHOLD
 
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 
-load_dotenv()   # reads .env so GROQ_API_KEY is available via os.getenv()
+load_dotenv()
 
 PDF_PATH   = os.path.join("data", "input", "sample_business_statement.pdf")
 OUT_DIR    = os.path.join("data", "output")
@@ -27,8 +27,8 @@ TALLY_PATH = os.path.join(OUT_DIR, "tally_import.csv")
 
 def validate_balances(df: pd.DataFrame) -> bool:
     """
-    Walks every row and checks:
-        previous_balance - debit + credit  ≈  current_balance  (±0.01)
+    Walks every row and verifies:
+        previous_balance - debit + credit  ≈  current_balance  (±₹0.01)
 
     Opening balance is back-calculated from row 0:
         opening = balance[0] + debit[0] - credit[0]
@@ -43,8 +43,8 @@ def validate_balances(df: pd.DataFrame) -> bool:
             print(
                 f"\n      [VALIDATOR] ❌  Mismatch on row {idx} "
                 f"({row['Date'].strftime('%d/%m/%Y')}):\n"
-                f"        Expected : {expected:.2f}\n"
-                f"        Actual   : {actual:.2f}"
+                f"        Expected : ₹{expected:,.2f}\n"
+                f"        Actual   : ₹{actual:,.2f}"
             )
             return False
         prev_balance = actual
@@ -57,37 +57,212 @@ def validate_balances(df: pd.DataFrame) -> bool:
 # ---------------------------------------------------------------------------
 
 def _save_excel(df: pd.DataFrame, path: str) -> None:
-    """CA-ready Excel: readable columns, dates formatted DD/MM/YYYY."""
-    out = df[["Date", "Narration", "Clean_Description", "CoA_Category",
-              "Debit", "Credit", "Balance"]].copy()
-    out["Date"] = out["Date"].dt.strftime("%d/%m/%Y")
+    """
+    Writes a two-sheet Excel workbook:
+
+    Sheet 1 — "Transactions"
+        All 173 rows with columns:
+        Date | Narration | Clean_Description | CoA_Category |
+        Confidence_Score | Reasoning | Review_Required | Debit | Credit | Balance
+
+        Review_Required = TRUE when Confidence_Score < threshold OR category is Uncategorized.
+        CA workflow: filter Review_Required = TRUE → fix only those rows, ignore the rest.
+
+    Sheet 2 — "Summary"
+        Financial totals by category + overall inflow/outflow/net.
+        This is what a CA looks at first before drilling into transactions.
+    """
     try:
-        out.to_excel(path, index=False)
-        print(f"      ✅  Excel  → {path}")
-    except PermissionError:
-        print(f"\n[!] Cannot write '{path}' — close it in Excel first, then re-run.")
+        import openpyxl
+        from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        print("      [!] openpyxl not installed. Run: pip install openpyxl")
         sys.exit(1)
+
+    # ── Build the transactions DataFrame ──────────────────────────────
+    out = df[[
+        "Date", "Narration", "Clean_Description", "CoA_Category",
+        "Confidence_Score", "Reasoning", "Debit", "Credit", "Balance"
+    ]].copy()
+
+    out["Date"] = out["Date"].dt.strftime("%d/%m/%Y")
+
+    # Review_Required: True if confidence low OR category is Uncategorized
+    out["Review_Required"] = (
+        (df["Confidence_Score"] < CONFIDENCE_THRESHOLD) |
+        (df["CoA_Category"] == "Uncategorized")
+    )
+
+    # Reorder so Review_Required is visible right after CoA columns
+    out = out[[
+        "Date", "Narration", "Clean_Description", "CoA_Category",
+        "Confidence_Score", "Reasoning", "Review_Required",
+        "Debit", "Credit", "Balance"
+    ]]
+
+    # ── Build the summary DataFrame ───────────────────────────────────
+    summary_rows = []
+
+    # Per-category totals
+    for cat in sorted(df["CoA_Category"].unique()):
+        cat_df   = df[df["CoA_Category"] == cat]
+        total_dr = cat_df["Debit"].sum()
+        total_cr = cat_df["Credit"].sum()
+        count    = len(cat_df)
+        summary_rows.append({
+            "Category":    cat,
+            "Txn Count":   count,
+            "Total Debit": round(total_dr, 2),
+            "Total Credit":round(total_cr, 2),
+            "Net":         round(total_cr - total_dr, 2),
+        })
+
+    summary_df = pd.DataFrame(summary_rows)
+
+    # Overall totals row
+    overall = {
+        "Category":     "── TOTAL ──",
+        "Txn Count":    len(df),
+        "Total Debit":  round(df["Debit"].sum(), 2),
+        "Total Credit": round(df["Credit"].sum(), 2),
+        "Net":          round(df["Credit"].sum() - df["Debit"].sum(), 2),
+    }
+
+    # Opening / closing balance
+    opening_balance = df.iloc[0]["Balance"] + df.iloc[0]["Debit"] - df.iloc[0]["Credit"]
+    closing_balance = df.iloc[-1]["Balance"]
+
+    # Flagging stats
+    review_count = out["Review_Required"].sum()
+
+    # ── Write to Excel ────────────────────────────────────────────────
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        # Sheet 1 — Transactions
+        out.to_excel(writer, sheet_name="Transactions", index=False)
+        ws_txn = writer.sheets["Transactions"]
+
+        # Freeze header row
+        ws_txn.freeze_panes = "A2"
+
+        # Column widths
+        col_widths = {
+            "A": 12,   # Date
+            "B": 45,   # Narration
+            "C": 28,   # Clean_Description
+            "D": 26,   # CoA_Category
+            "E": 16,   # Confidence_Score
+            "F": 40,   # Reasoning
+            "G": 16,   # Review_Required
+            "H": 14,   # Debit
+            "I": 14,   # Credit
+            "J": 14,   # Balance
+        }
+        for col, width in col_widths.items():
+            ws_txn.column_dimensions[col].width = width
+
+        # Style header row
+        header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=10)
+        for cell in ws_txn[1]:
+            cell.fill      = header_fill
+            cell.font      = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        ws_txn.row_dimensions[1].height = 30
+
+        # Highlight Review_Required = True rows in yellow
+        review_fill  = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+        flag_col_idx = out.columns.get_loc("Review_Required") + 1   # 1-indexed
+
+        for row_idx, row_val in enumerate(out["Review_Required"], start=2):
+            if row_val:
+                for col_idx in range(1, len(out.columns) + 1):
+                    ws_txn.cell(row=row_idx, column=col_idx).fill = review_fill
+                # Also make the Review_Required cell itself red-bold
+                flag_cell            = ws_txn.cell(row=row_idx, column=flag_col_idx)
+                flag_cell.font       = Font(bold=True, color="C00000")
+                flag_cell.alignment  = Alignment(horizontal="center")
+
+        # Sheet 2 — Summary
+        summary_df.to_excel(writer, sheet_name="Summary", index=False, startrow=6)
+        ws_sum = writer.sheets["Summary"]
+        ws_sum.column_dimensions["A"].width = 28
+        ws_sum.column_dimensions["B"].width = 12
+        ws_sum.column_dimensions["C"].width = 16
+        ws_sum.column_dimensions["D"].width = 16
+        ws_sum.column_dimensions["E"].width = 14
+
+        # Header block at the top of Summary sheet
+        title_font  = Font(bold=True, size=13, color="1F4E79")
+        label_font  = Font(bold=True, size=10)
+        value_font  = Font(size=10)
+        green_font  = Font(bold=True, color="375623", size=10)
+        red_font    = Font(bold=True, color="C00000", size=10)
+
+        ws_sum["A1"] = "FINANCIAL SUMMARY"
+        ws_sum["A1"].font = title_font
+
+        kv_rows = [
+            ("Opening Balance",  f"₹{opening_balance:,.2f}"),
+            ("Closing Balance",  f"₹{closing_balance:,.2f}"),
+            ("Total Inflow",     f"₹{df['Credit'].sum():,.2f}"),
+            ("Total Outflow",    f"₹{df['Debit'].sum():,.2f}"),
+            ("Net Cash Flow",    f"₹{df['Credit'].sum() - df['Debit'].sum():,.2f}"),
+            ("Transactions",     str(len(df))),
+            ("Flagged for Review", str(int(review_count))),
+        ]
+
+        for i, (label, value) in enumerate(kv_rows, start=2):
+            ws_sum.cell(row=i, column=1).value = label
+            ws_sum.cell(row=i, column=1).font  = label_font
+            ws_sum.cell(row=i, column=2).value = value
+            # Colour net cash flow green/red
+            if label == "Net Cash Flow":
+                net_val = df["Credit"].sum() - df["Debit"].sum()
+                ws_sum.cell(row=i, column=2).font = green_font if net_val >= 0 else red_font
+            elif label == "Flagged for Review" and review_count > 0:
+                ws_sum.cell(row=i, column=2).font = red_font
+            else:
+                ws_sum.cell(row=i, column=2).font = value_font
+
+        # Style the category breakdown table header (row 7)
+        for cell in ws_sum[7]:
+            cell.fill      = header_fill
+            cell.font      = header_font
+            cell.alignment = Alignment(horizontal="center")
+
+        # Total row at the bottom of the category table
+        total_row_idx = 7 + len(summary_df) + 1
+        total_fill    = PatternFill(start_color="D6E4F0", end_color="D6E4F0", fill_type="solid")
+        total_data    = [
+            overall["Category"],
+            overall["Txn Count"],
+            overall["Total Debit"],
+            overall["Total Credit"],
+            overall["Net"],
+        ]
+        for col_idx, val in enumerate(total_data, start=1):
+            cell            = ws_sum.cell(row=total_row_idx, column=col_idx)
+            cell.value      = val
+            cell.fill       = total_fill
+            cell.font       = Font(bold=True, size=10)
+            cell.alignment  = Alignment(horizontal="center")
+
+    print(f"      ✅  Excel  → {path}  ({int(review_count)} rows flagged for review)")
 
 
 def _save_tally_csv(df: pd.DataFrame, path: str) -> None:
     """
-    Tally-ready CSV.
-    Columns: Date | Voucher_Type | Ledger_Name | Amount
-    Voucher_Type is 'Payment' when Debit > 0, 'Receipt' when Credit > 0.
-    Amount is always a positive absolute value.
+    Tally-ready CSV — clean data only, no review flags.
+    Columns: Date | Voucher_Type | Ledger_Name | CoA_Category | Amount
     """
     tally = df[["Date", "Clean_Description", "CoA_Category", "Debit", "Credit"]].copy()
-    tally["Date"] = df["Date"].dt.strftime("%d/%m/%Y")
-
-    tally["Voucher_Type"] = tally.apply(
-        lambda r: "Payment" if r["Debit"] > 0 else "Receipt", axis=1
-    )
-    tally["Amount"] = tally.apply(
-        lambda r: r["Debit"] if r["Debit"] > 0 else r["Credit"], axis=1
-    )
+    tally["Date"]         = df["Date"].dt.strftime("%d/%m/%Y")
+    tally["Voucher_Type"] = tally.apply(lambda r: "Payment" if r["Debit"] > 0 else "Receipt", axis=1)
+    tally["Amount"]       = tally.apply(lambda r: r["Debit"] if r["Debit"] > 0 else r["Credit"], axis=1)
     tally = tally.rename(columns={"Clean_Description": "Ledger_Name"})
     tally = tally[["Date", "Voucher_Type", "Ledger_Name", "CoA_Category", "Amount"]]
-
     tally.to_csv(path, index=False)
     print(f"      ✅  Tally  → {path}")
 
@@ -121,26 +296,27 @@ def run_pipeline() -> None:
     if not validate_balances(clean_df):
         print("\n      [!] Validation FAILED — fix extraction before proceeding.")
         sys.exit(1)
-    print("      → All 173 balances verified ✅")
+    print(f"      → All {len(clean_df)} balances verified ✅")
 
     # ── Step 4: Scrub PII ────────────────────────────────────────────────
     print("\n[4/5] Scrubbing PII and building Clean_Description...")
     safe_df = DataSanitizer(clean_df).scrub_pii()
-    print(f"      → PII scrubbed. Sample:")
-    sample = safe_df[["Narration", "Clean_Description"]].drop_duplicates().head(5)
+    sample  = safe_df[["Narration", "Clean_Description"]].drop_duplicates().head(5)
     for _, row in sample.iterrows():
-        print(f"        {row['Narration'][:45]:<45}  →  {row['Clean_Description']}")
+        print(f"      {row['Narration'][:42]:<42}  →  {row['Clean_Description']}")
 
-    # ── Step 4.5: CoA Categorisation ─────────────────────────────────────
-    print("\n[4.5/5] Categorising transactions via Groq LLM...")
+    # ── Step 4.5: CoA Categorisation + Confidence Scoring ────────────────
+    print("\n[4.5/5] Categorising via Groq LLM (with confidence scoring)...")
     groq_api_key = os.getenv("GROQ_API_KEY")
+
     if not groq_api_key:
         print(
-            "      [!] GROQ_API_KEY not found in environment.\n"
-            "          Add  GROQ_API_KEY=gsk_...  to your .env file.\n"
-            "          Skipping categorisation — CoA_Category will be 'Uncategorized'."
+            "      [!] GROQ_API_KEY not set in .env — skipping LLM categorisation.\n"
+            "          All rows will be marked Uncategorized / Review_Required = True."
         )
-        safe_df["CoA_Category"] = "Uncategorized"
+        safe_df["CoA_Category"]     = "Uncategorized"
+        safe_df["Confidence_Score"] = 0
+        safe_df["Reasoning"]        = "GROQ_API_KEY not configured."
     else:
         mapper  = CoAMapper(api_key=groq_api_key)
         safe_df = mapper.map(safe_df)
@@ -150,17 +326,27 @@ def run_pipeline() -> None:
     _save_excel(safe_df, EXCEL_PATH)
     _save_tally_csv(safe_df, TALLY_PATH)
 
-    # Summary
-    print(f"\n{'─' * 55}")
-    print(f"  Pipeline complete.")
-    print(f"  Transactions processed : {len(safe_df)}")
-    if "CoA_Category" in safe_df.columns:
-        cat_counts = safe_df["CoA_Category"].value_counts()
-        print(f"  Category breakdown:")
-        for cat, count in cat_counts.items():
-            print(f"    {cat:<30} {count:>4} rows")
-    print(f"  Output : {os.path.abspath(OUT_DIR)}")
-    print(f"{'─' * 55}\n")
+    # ── Terminal summary ─────────────────────────────────────────────────
+    review_count = int(
+        ((safe_df["Confidence_Score"] < CONFIDENCE_THRESHOLD) |
+         (safe_df["CoA_Category"] == "Uncategorized")).sum()
+    )
+
+    print(f"\n{'─' * 58}")
+    print(f"  Pipeline complete — {len(safe_df)} transactions processed")
+    print(f"  Opening balance : ₹{clean_df.iloc[0]['Balance'] + clean_df.iloc[0]['Debit'] - clean_df.iloc[0]['Credit']:>12,.2f}")
+    print(f"  Total inflow    : ₹{clean_df['Credit'].sum():>12,.2f}")
+    print(f"  Total outflow   : ₹{clean_df['Debit'].sum():>12,.2f}")
+    net = clean_df['Credit'].sum() - clean_df['Debit'].sum()
+    print(f"  Net cash flow   : ₹{net:>12,.2f}  {'▲' if net >= 0 else '▼'}")
+    print(f"  Closing balance : ₹{clean_df.iloc[-1]['Balance']:>12,.2f}")
+    print(f"  Flagged rows    : {review_count}  (Confidence < {CONFIDENCE_THRESHOLD}% or Uncategorized)")
+    print(f"\n  Category breakdown:")
+    for cat, count in safe_df["CoA_Category"].value_counts().items():
+        bar = "█" * min(count, 30)
+        print(f"    {cat:<28} {count:>4}  {bar}")
+    print(f"\n  Output : {os.path.abspath(OUT_DIR)}")
+    print(f"{'─' * 58}\n")
 
 
 if __name__ == "__main__":
