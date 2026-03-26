@@ -1,4 +1,0 @@
-pdfplumber
-pandas
-openpyxl
-django
