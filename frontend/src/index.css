@@ -1,0 +1,59 @@
+:root {
+  /* ============================
+     PRIMARY COLOR PALETTE
+     ============================ */
+  --color-primary-purple: #7353F6;
+  --color-graphite-black: #2C2C2C;
+  --color-white: #ffffff;
+
+  /* ============================
+     SECONDARY COLOR PALETTE
+     ============================ */
+  --color-lavender: #A88BFF;
+  --color-pale-purple: #EBE4FF;
+  --color-sky-blue: #5CC9F5;
+  --color-neutral-dark-gray: #231F20;
+  --color-light-gray: #EBEBEB;
+
+  /* ============================
+     GRADIENTS
+     ============================ */
+  --gradient-innovation: linear-gradient(135deg, #7353F6 0%, #00C0FF 100%);
+
+  /* ============================
+     TYPOGRAPHY
+     ============================ */
+  --font-heading: 'Bebas Neue', sans-serif;
+  --font-body: 'Montserrat', sans-serif;
+  
+  /* ADA Accessibility compliant contrasts */
+  --text-on-purple: var(--color-white);
+  --text-on-light: var(--color-neutral-dark-gray);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-light-gray);
+  color: var(--color-neutral-dark-gray);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  letter-spacing: 1px;
+  color: var(--color-graphite-black);
+}
+
+.innovation-text {
+  background: var(--gradient-innovation);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

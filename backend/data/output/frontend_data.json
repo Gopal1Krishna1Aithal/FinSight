@@ -1,19 +1,185 @@
 {
     "runway_and_burn_rate": {
-        "daily_burn_rate": 9095.47,
-        "monthly_burn_rate": 272864.17,
-        "average_monthly_inflow": 263539.95,
+        "daily_burn_rate": 9095.51,
+        "monthly_burn_rate": 272865.28,
+        "average_monthly_inflow": 263546.53,
         "current_balance": 1188320.0,
         "runway_days_left": 130.6,
         "health_status": "HEALTHY"
     },
     "crisis_survival_mode": {
-        "essential_monthly_overhead": 219409.16,
+        "essential_monthly_overhead": 219410.27,
         "crisis_runway_days_left": 162.5,
-        "total_tracked_essential_spend": 16016868.84
+        "total_tracked_essential_spend": 16016949.68
     },
     "cash_withdrawal_tracker": {
         "total_cash_withdrawn": 236200.0,
         "tds_194N_limit": 2000000.0,
         "limit_remaining": 1763800.0,
-        "warning_active": 
+        "warning_active": false
+    },
+    "draft_pnl_statement": {
+        "Total_Income": 16027168.7,
+        "Operating_Expenses": 18281458.63,
+        "Financial_Expenses": 220161.68,
+        "Gross_Estimated_Profit": -2474451.61,
+        "Non_PnL_Outflows": {
+            "Cash_Drawings": 236200.0,
+            "Suspense_Uncategorized": 611.0
+        }
+    },
+    "vendor_dependency": {
+        "total_tracked_vendors": 156,
+        "top_vendors": [
+            {
+                "vendor_name": "BULK NEFT SALARY OCT 2023 5 EMPLOYEES + DIWALI BONUS Rs 50K EACH",
+                "total_spend": 655000.0,
+                "transaction_count": 1,
+                "percentage_of_total_outflow": 3.29
+            },
+            {
+                "vendor_name": "BULK NEFT SALARY MAR 2024 6 EMPLOYEES + PERFORMANCE BONUS",
+                "total_spend": 620000.0,
+                "transaction_count": 1,
+                "percentage_of_total_outflow": 3.11
+            },
+            {
+                "vendor_name": "NEFT HDFC0009876 DELL INDIA 20 LAPTOP REFRESH Q4 CAPEX",
+                "total_spend": 580000.0,
+                "transaction_count": 1,
+                "percentage_of_total_outflow": 2.91
+            },
+            {
+                "vendor_name": "BULK NEFT SALARY JAN 2024 6 EMP \u2014 POST APPRAISAL REVISED CTCS",
+                "total_spend": 550000.0,
+                "transaction_count": 1,
+                "percentage_of_total_outflow": 2.76
+            },
+            {
+                "vendor_name": "BULK NEFT SALARY FEB 2024 6 EMPLOYEES PROCESSED",
+                "total_spend": 550000.0,
+                "transaction_count": 1,
+                "percentage_of_total_outflow": 2.76
+            },
+            {
+                "vendor_name": "BULK NEFT SALARY DEC 2023 6 EMPLOYEES PROCESSED LIMITED",
+                "total_spend": 495000.0,
+                "transaction_count": 1,
+                "percentage_of_total_outflow": 2.49
+            },
+            {
+                "vendor_name": "BULK NEFT SALARY NOV 2023 6 EMPLOYEES (NEW HIRE ADDED)",
+                "total_spend": 495000.0,
+                "transaction_count": 1,
+                "percentage_of_total_outflow": 2.49
+            },
+            {
+                "vendor_name": "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE BILL JAN CYCLE",
+                "total_spend": 448000.0,
+                "transaction_count": 1,
+                "percentage_of_total_outflow": 2.25
+            },
+            {
+                "vendor_name": "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE BILL DEC CYCLE",
+                "total_spend": 422000.0,
+                "transaction_count": 1,
+                "percentage_of_total_outflow": 2.12
+            },
+            {
+                "vendor_name": "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE BILL OCT CYCLE",
+                "total_spend": 415000.0,
+                "transaction_count": 1,
+                "percentage_of_total_outflow": 2.08
+            }
+        ]
+    },
+    "recurring_subscriptions": {
+        "total_recurring_subscriptions_found": 15,
+        "estimated_fixed_monthly_cost": 17011.84,
+        "detected_subscriptions": [
+            {
+                "vendor_name": "CREDIT CARD AUTOPAY",
+                "recurring_amount": 8841.0,
+                "times_detected": 2
+            },
+            {
+                "vendor_name": "UKARHEALTHCARE PO",
+                "recurring_amount": 2000.0,
+                "times_detected": 2
+            },
+            {
+                "vendor_name": "CREDIT CARD AUTOPAY",
+                "recurring_amount": 1666.0,
+                "times_detected": 2
+            },
+            {
+                "vendor_name": "CREDIT CARD AUTOPAY",
+                "recurring_amount": 1387.0,
+                "times_detected": 2
+            },
+            {
+                "vendor_name": "CREDIT CARD AUTOPAY",
+                "recurring_amount": 1187.0,
+                "times_detected": 2
+            },
+            {
+                "vendor_name": "UKARHEALTHCARE PO",
+                "recurring_amount": 500.0,
+                "times_detected": 4
+            },
+            {
+                "vendor_name": "UKAR HEALTHCARE PO S",
+                "recurring_amount": 500.0,
+                "times_detected": 2
+            },
+            {
+                "vendor_name": "UKARHEALTHCARE PO",
+                "recurring_amount": 300.0,
+                "times_detected": 2
+            },
+            {
+                "vendor_name": "UKARHEALTHCARE PO",
+                "recurring_amount": 200.0,
+                "times_detected": 3
+            },
+            {
+                "vendor_name": "UKAR HEALTHCARE PO S",
+                "recurring_amount": 200.0,
+                "times_detected": 3
+            },
+            {
+                "vendor_name": "UKARHEALTHCARE PO",
+                "recurring_amount": 150.0,
+                "times_detected": 2
+            },
+            {
+                "vendor_name": "BANK FEE ATMCASH 670",
+                "recurring_amount": 23.6,
+                "times_detected": 2
+            },
+            {
+                "vendor_name": "BANK FEE ATMCASH 805",
+                "recurring_amount": 23.6,
+                "times_detected": 2
+            },
+            {
+                "vendor_name": "BANK FEE ATMCASH 388",
+                "recurring_amount": 23.6,
+                "times_detected": 2
+            },
+            {
+                "vendor_name": "BANK FEE ATMNONCASH",
+                "recurring_amount": 10.04,
+                "times_detected": 2
+            }
+        ]
+    },
+    "summary": {
+        "total_transactions": 361,
+        "latest_balance": 1188320.0,
+        "date_range": {
+            "start": "2018-04-02",
+            "end": "2024-03-31"
+        }
+    }
+}

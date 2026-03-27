@@ -55,8 +55,16 @@ class FrontendDataEngine:
                 },
             }
 
+            class _NumpySafe(json.JSONEncoder):
+                def default(self, obj):
+                    import numpy as np
+                    if isinstance(obj, np.bool_): return bool(obj)
+                    if isinstance(obj, np.integer): return int(obj)
+                    if isinstance(obj, np.floating): return float(obj)
+                    return super().default(obj)
+
             with open(self.output_path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, indent=4)
+                json.dump(payload, f, indent=4, cls=_NumpySafe)
 
             print(f"      ✅  Frontend APIs → {self.output_path}")
             return True

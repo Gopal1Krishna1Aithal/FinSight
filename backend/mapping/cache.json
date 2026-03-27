@@ -1013,5 +1013,25 @@
     "category": "Credit Card Repayment",
     "confidence": 90,
     "reasoning": "Credit card autopay for March statement"
+  },
+  "SALARY CREDIT": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Exact match with payroll category definition"
+  },
+  "SALARY SIZWAN": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Exact match with payroll category definition"
+  },
+  "PAYTMPO": {
+    "category": "E-Commerce & Retail",
+    "confidence": 90,
+    "reasoning": "Paytm is a popular e-commerce and retail payment platform"
+  },
+  "PHONEPERECHPO": {
+    "category": "Utilities & Telecom",
+    "confidence": 90,
+    "reasoning": "PhonePe is a mobile recharge and utility payment service"
   }
 }
