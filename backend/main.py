@@ -7,6 +7,8 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from core.extractors.hdfc_pdf import HDFCPDFExtractor
+from core.extractors.universal_pdf import UniversalPDFExtractor
+from core.extractors.extraction_validator import ExtractionValidator
 from core.processors.cleaner import HDFCDataCleaner
 from core.processors.sanitizer import DataSanitizer
 from core.ai_services.coa_mapper import CoAMapper, CONFIDENCE_THRESHOLD
@@ -30,6 +32,16 @@ parser.add_argument(
     nargs="?",
     default=os.path.join("data", "input", "pdfs"),
     help="Path to the PDF statement or folder of statements",
+)
+parser.add_argument(
+    "--extractor",
+    choices=["universal", "hdfc"],
+    default="universal",
+    help=(
+        "Extraction engine to use. "
+        "'universal' (default) uses Gemini AI — works for any bank, any layout. "
+        "'hdfc' uses the legacy pdfplumber engine (HDFC statements only, no API call)."
+    ),
 )
 args = parser.parse_args()
 
@@ -400,11 +412,51 @@ def run_pipeline() -> None:
 
     # ── Step 1: Extract ──────────────────────────────────────────────────
     print(f"\n[1/6] Extracting raw transactions from '{PDF_PATH}'...")
+    print(f"      Engine : {args.extractor.upper()}")
     if not os.path.exists(PDF_PATH):
         print(f"      [!] Path not found at '{PDF_PATH}'. Aborting.")
         sys.exit(1)
 
     raw_data = []
+
+    # ── Helper: extract one PDF using the requested engine (with fallback) ──
+    def _extract_single_pdf(pdf_file: str) -> list[dict]:
+        """
+        Extract one PDF file using the selected engine.
+        - 'universal' mode: tries UniversalPDFExtractor first;
+           if it returns 0 rows or fails, falls back to HDFCPDFExtractor.
+        - 'hdfc' mode: uses HDFCPDFExtractor directly (no API call).
+        Returns a list[dict] (may be empty).
+        """
+        if args.extractor == "hdfc":
+            data = HDFCPDFExtractor(pdf_file).extract()
+            return data or []
+
+        # --- Universal mode ---
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_key:
+            print(
+                "      [!] GEMINI_API_KEY not set — cannot use universal extractor.\n"
+                "          Falling back to HDFCPDFExtractor (HDFC statements only)."
+            )
+            data = HDFCPDFExtractor(pdf_file).extract()
+            return data or []
+
+        try:
+            data = UniversalPDFExtractor(pdf_file, api_key=gemini_key).extract()
+        except Exception as e:
+            print(f"      [Universal] Error: {e}")
+            data = None
+
+        if not data:
+            print(
+                "      [Universal] ⚠  0 rows — falling back to HDFCPDFExtractor..."
+            )
+            data = HDFCPDFExtractor(pdf_file).extract()
+            return data or []
+
+        return data
+
     if os.path.isdir(PDF_PATH):
         # If the default pdfs folder is explicitly empty, check the images folder as a convenience fallback
         if PDF_PATH == os.path.join("data", "input", "pdfs") and not os.listdir(
@@ -441,11 +493,11 @@ def run_pipeline() -> None:
             raw_data = extractor.extract() or []
         elif pdf_files:
             print(
-                f"      [PDF] Found {len(pdf_files)} PDF files in {PDF_PATH}. Processing sequentially..."
+                f"      Found {len(pdf_files)} PDF file(s) in {PDF_PATH}. Processing sequentially..."
             )
             for pf in sorted(pdf_files):
                 print(f"            → Extracting {os.path.basename(pf)}...")
-                ext_data = HDFCPDFExtractor(pf).extract()
+                ext_data = _extract_single_pdf(pf)
                 if ext_data:
                     raw_data.extend(ext_data)
         else:
@@ -456,8 +508,7 @@ def run_pipeline() -> None:
     else:
         # Standard Single File Extractor
         if PDF_PATH.lower().endswith(".pdf"):
-            print(f"      [PDF] Extracting single file {os.path.basename(PDF_PATH)}...")
-            raw_data = HDFCPDFExtractor(PDF_PATH).extract() or []
+            raw_data = _extract_single_pdf(PDF_PATH)
         else:
             print(f"      [!] File {PDF_PATH} is not a PDF. Aborting.")
             sys.exit(1)
@@ -466,6 +517,20 @@ def run_pipeline() -> None:
         print("      [!] Extraction returned no data. Aborting.")
         sys.exit(1)
     print(f"      → {len(raw_data)} rows extracted.")
+
+    # ── Step 1.5: Validate extraction quality ────────────────────────────
+    print("\n[1.5/6] Validating extraction quality...")
+    val_result = ExtractionValidator(raw_data).validate()
+    print(val_result.report())
+    if not val_result.passed:
+        print(
+            "      [!] Extraction validation FAILED. "
+            "The data is not safe to process. Aborting.\n"
+            "      Tip: Try running with '--extractor hdfc' if this is an HDFC statement, "
+            "or check that the PDF contains a standard bank transaction table."
+        )
+        sys.exit(1)
+    print("      ✅  Extraction validation passed.")
 
     # ── Step 2: Clean ────────────────────────────────────────────────────
     print("\n[2/6] Cleaning narrations and coercing numbers...")
