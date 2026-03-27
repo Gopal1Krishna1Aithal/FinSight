@@ -399,3 +399,44 @@ header p {
 @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 
+
+/* -- Period Cards -------------------------------------------- */
+.period-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.2rem;
+  margin-top: 1.5rem;
+  animation: fadeUp 0.7s ease both;
+}
+
+.period-card {
+  background: var(--color-white);
+  padding: 1.25rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: transform 0.2s ease;
+}
+
+.period-card:hover { transform: translateY(-3px); }
+
+.period-card-label {
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.5px;
+}
+
+.period-card-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: #666;
+}
+
+.period-card-row strong {
+  color: var(--color-graphite-black);
+  font-weight: 600;
+}

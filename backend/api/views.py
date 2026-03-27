@@ -233,9 +233,29 @@ def _compute_metrics(df) -> dict:
 # Pipeline runner
 # ---------------------------------------------------------------------------
 
-def _run_pipeline(file_path: str) -> dict:
+# ── Multi-period helpers (mirrored from main.py) ───────────────────────────
+_QUARTER_LABELS = {"Q1": "Apr–Jun", "Q2": "Jul–Sep", "Q3": "Oct–Dec", "Q4": "Jan–Mar"}
+_FY_LABELS = {"FY2324": "23", "FY2425": "24", "FY2526": "25"}
+
+def _infer_period_label(filename: str, df) -> tuple[str, str]:
+    import re
+    stem = os.path.basename(filename)
+    m = re.search(r"(Q[1-4])[\s_-]*(FY\d{4})", stem, re.IGNORECASE)
+    if m:
+        q = m.group(1).upper(); fy = m.group(2).upper()
+        qm = _QUARTER_LABELS.get(q, "?"); yy = _FY_LABELS.get(fy, fy[-2:])
+        return f"{q} {fy}", f"{q} {qm} {yy}"
+    if df is not None and not df.empty and "Date" in df.columns:
+        d_min = df["Date"].min().strftime("%b %Y")
+        d_max = df["Date"].max().strftime("%b %Y")
+        return f"{d_min}–{d_max}", f"{d_min}–{d_max}"[:18]
+    return "FY2324", "Transactions"
+
+
+def _run_pipeline(file_paths: list[str]) -> dict:
     from dotenv import load_dotenv
     load_dotenv()
+    import pandas as pd
 
     from core.extractors.hdfc_pdf import HDFCPDFExtractor
     from core.processors.cleaner import HDFCDataCleaner
@@ -251,48 +271,72 @@ def _run_pipeline(file_path: str) -> dict:
     TALLY_XML     = os.path.join(OUT_DIR, "tally_import.xml")
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    init_db()
-
-    # Extract
-    if file_path.lower().endswith(".pdf"):
-        raw_data = HDFCPDFExtractor(file_path).extract() or []
-    else:
-        from core.extractors.image_ocr import ImageOCRExtractor
-        raw_data = ImageOCRExtractor(image_paths=[file_path]).extract() or []
-
-    if not raw_data:
-        return {"error": "Extraction returned no data. Check the file format or bank statement layout."}
-
-    clean_df = HDFCDataCleaner(raw_data).clean()
-    if clean_df.empty:
-        return {"error": "Cleaning step produced no valid rows. The PDF may be scanned or image-based."}
-
-    safe_df = DataSanitizer(clean_df).scrub_pii()
-
     groq_api_key = os.getenv("GROQ_API_KEY")
-    if groq_api_key:
-        safe_df = CoAMapper(api_key=groq_api_key).map(safe_df)
-    else:
-        safe_df["CoA_Category"]     = "Uncategorized"
-        safe_df["Confidence_Score"] = 0
-        safe_df["Reasoning"]        = "GROQ_API_KEY not set."
+    all_dfs = []
+    
+    for f_path in file_paths:
+        fname = os.path.basename(f_path)
+        # Extract
+        if f_path.lower().endswith(".pdf"):
+            raw_data = HDFCPDFExtractor(f_path).extract() or []
+        else:
+            from core.extractors.image_ocr import ImageOCRExtractor
+            raw_data = ImageOCRExtractor(image_paths=[f_path]).extract() or []
+        
+        if not raw_data: continue
 
-    upsert_transactions(safe_df)
+        # Clean + Sanitize
+        clean_df = HDFCDataCleaner(raw_data).clean()
+        if clean_df.empty: continue
+        safe_df = DataSanitizer(clean_df).scrub_pii()
 
-    # Save tally exports
+        # CoA Mapping
+        if groq_api_key:
+            safe_df = CoAMapper(api_key=groq_api_key).map(safe_df)
+        else:
+            safe_df["CoA_Category"] = "Uncategorized"; safe_df["Confidence_Score"] = 0; safe_df["Reasoning"] = "No API Key"
+
+        # Tag period
+        period_label, _ = _infer_period_label(fname, safe_df)
+        safe_df["Period"] = period_label
+        
+        # Upsert
+        upsert_transactions(safe_df, source_file=fname, period_label=period_label)
+        all_dfs.append(safe_df)
+
+    if not all_dfs:
+        return {"error": "Extraction failed for all files. Check formats or bank layout."}
+
+    # Consolidated DF for the response
+    combined_df = pd.concat(all_dfs, ignore_index=True)
+    combined_df = combined_df.sort_values("Date").reset_index(drop=True)
+
+    # Save tally exports (cumulative for this session)
     try:
-        _save_tally_csv(safe_df, TALLY_CSV)
-        _save_tally_xml(safe_df, TALLY_XML)
-    except Exception as e:
-        print(f"[Tally Export] Warning: {e}")
+        _save_tally_csv(combined_df, TALLY_CSV)
+        _save_tally_xml(combined_df, TALLY_XML)
+    except Exception as e: print(f"[Tally Export] Warning: {e}")
 
-    # Generate insights markdown
-    try:
-        InsightsGenerator().generate_insights(INSIGHTS_PATH)
-    except Exception:
-        pass
+    # Generate insights
+    try: InsightsGenerator().generate_insights(INSIGHTS_PATH)
+    except Exception: pass
 
-    payload = _compute_metrics(safe_df)
+    # Compute metrics + period breakdown
+    payload = _compute_metrics(combined_df)
+    
+    # Add period_breakdown for multi-period display
+    periods = []
+    for label in combined_df["Period"].unique():
+        pdf = combined_df[combined_df["Period"] == label]
+        periods.append({
+            "label":           str(label),
+            "total_inflow":    round(float(pdf["Credit"].sum()), 2),
+            "total_outflow":   round(float(pdf["Debit"].sum()), 2),
+            "net_cashflow":    round(float(pdf["Credit"].sum() - pdf["Debit"].sum()), 2),
+            "closing_balance": round(float(pdf.iloc[-1]["Balance"]), 2),
+        })
+    payload["period_breakdown"] = periods
+
     return json.loads(json.dumps(payload, cls=_SafeEncoder))
 
 
@@ -303,35 +347,41 @@ def _run_pipeline(file_path: str) -> dict:
 @csrf_exempt
 @require_http_methods(["POST"])
 def upload_statement(request):
-    """POST /api/upload/ — accepts PDF or image, runs pipeline, returns metrics."""
+    """POST /api/upload/ — accepts multiple files, runs batch pipeline, returns metrics."""
     if "file" not in request.FILES:
         return JsonResponse({"error": "No file provided."}, status=400)
 
-    uploaded = request.FILES["file"]
-    ext      = os.path.splitext(uploaded.name)[1].lower()
-    allowed  = {".pdf", ".jpg", ".jpeg", ".png", ".heic"}
-
-    if ext not in allowed:
-        return JsonResponse({"error": f"Unsupported file type '{ext}'."}, status=400)
-
-    upload_dir = os.path.join("data", "input", "uploads")
+    uploaded_files = request.FILES.getlist("file")
+    allowed_exts   = {".pdf", ".jpg", ".jpeg", ".png", ".heic"}
+    upload_dir     = os.path.join("data", "input", "uploads")
     os.makedirs(upload_dir, exist_ok=True)
-    save_path = os.path.join(upload_dir, f"{uuid.uuid4().hex}{ext}")
+    
+    saved_paths = []
+    
+    for up_file in uploaded_files:
+        ext = os.path.splitext(up_file.name)[1].lower()
+        if ext not in allowed_exts:
+            continue # skip invalid but keep processing others
+            
+        save_path = os.path.join(upload_dir, f"{uuid.uuid4().hex}_{up_file.name}")
+        with open(save_path, "wb") as f:
+            for chunk in up_file.chunks():
+                f.write(chunk)
+        saved_paths.append(save_path)
 
-    with open(save_path, "wb") as f:
-        for chunk in uploaded.chunks():
-            f.write(chunk)
+    if not saved_paths:
+        return JsonResponse({"error": "No supported files found in upload."}, status=400)
 
     try:
-        result = _run_pipeline(save_path)
+        result = _run_pipeline(saved_paths)
         return JsonResponse(result, status=200)
     except Exception as e:
         import traceback
         print(traceback.format_exc())
         return JsonResponse({"error": str(e)}, status=500)
     finally:
-        if os.path.exists(save_path):
-            os.remove(save_path)
+        for p in saved_paths:
+            if os.path.exists(p): os.remove(p)
 
 
 @require_http_methods(["GET"])
@@ -365,6 +415,65 @@ def download_tally_xml(request):
     response = FileResponse(open(path, "rb"), content_type="application/xml")
     response["Content-Disposition"] = 'attachment; filename="tally_import.xml"'
     return response
+
+
+@require_http_methods(["GET"])
+def download_excel(request):
+    """GET /api/download/excel/ — serves the clean_statement.xlsx workbook."""
+    path = os.path.join("data", "output", "clean_statement.xlsx")
+    if not os.path.exists(path):
+        return JsonResponse({"error": "Excel file not yet generated. Run the pipeline first."}, status=404)
+    response = FileResponse(
+        open(path, "rb"),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="clean_statement.xlsx"'
+    return response
+
+
+@require_http_methods(["GET"])
+def get_dashboard(request):
+    """GET /api/dashboard/ — aggregates all database transactions into a dashboard payload."""
+    from core.db.session import engine
+    import pandas as pd
+    
+    try:
+        df = pd.read_sql_query("SELECT * FROM transactions", engine)
+        if df.empty:
+            return JsonResponse({"error": "No data in database. Upload a statement first."}, status=404)
+        
+        # Format for _compute_metrics: Needs 'Date', 'Debit', 'Credit', 'Balance', 'CoA_Category' (case matches)
+        df["Date"] = pd.to_datetime(df["date"])
+        df = df.rename(columns={
+            "debit":             "Debit",
+            "credit":            "Credit",
+            "balance":           "Balance",
+            "coa_category":      "CoA_Category",
+            "clean_description": "Clean_Description",
+        })
+        
+        # Period computation for period_breakdown
+        payload = _compute_metrics(df)
+        
+        if "period_label" in df.columns:
+            periods = []
+            for label in df["period_label"].unique():
+                pdf = df[df["period_label"] == label]
+                periods.append({
+                    "label":           str(label),
+                    "total_inflow":    round(float(pdf["Credit"].sum()), 2),
+                    "total_outflow":   round(float(pdf["Debit"].sum()), 2),
+                    "net_cashflow":    round(float(pdf["Credit"].sum() - pdf["Debit"].sum()), 2),
+                    "closing_balance": round(float(pdf.iloc[-1]["Balance"]), 2),
+                })
+            payload["period_breakdown"] = periods
+            
+        return JsonResponse(payload, status=200, encoder=_SafeEncoder)
+        
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 @require_http_methods(["GET"])

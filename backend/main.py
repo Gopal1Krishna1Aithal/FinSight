@@ -1,8 +1,10 @@
 import os
 import sys
+import re
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
+
 import pandas as pd
 from dotenv import load_dotenv
 
@@ -19,59 +21,109 @@ from core.ai_services.insights_generator import InsightsGenerator
 from core.processors.analysis_engine import FrontendDataEngine
 import argparse
 
-
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
-
 load_dotenv()
+
+# ---------------------------------------------------------------------------
+# CLI args
+# ---------------------------------------------------------------------------
 
 parser = argparse.ArgumentParser(description="Process a business bank statement PDF.")
 parser.add_argument(
     "pdf",
     nargs="?",
     default=os.path.join("data", "input", "pdfs"),
-    help="Path to the PDF statement or folder of statements",
+    help="Path to a single PDF or a folder of PDFs",
 )
 parser.add_argument(
     "--extractor",
     choices=["universal", "hdfc"],
-    default="universal",
-    help=(
-        "Extraction engine to use. "
-        "'universal' (default) uses Gemini AI — works for any bank, any layout. "
-        "'hdfc' uses the legacy pdfplumber engine (HDFC statements only, no API call)."
-    ),
+    default="hdfc",
+    help="Extraction engine: 'hdfc' (default) for HDFC PDF parser; 'universal' for Gemini AI.",
 )
 args = parser.parse_args()
 
-PDF_PATH = args.pdf
-OUT_DIR = os.path.join("data", "output")
-EXCEL_PATH = os.path.join(OUT_DIR, "clean_statement.xlsx")
-TALLY_PATH = os.path.join(OUT_DIR, "tally_import.csv")
-TALLY_XML_PATH = os.path.join(OUT_DIR, "tally_import.xml")
+PDF_PATH     = args.pdf
+OUT_DIR      = os.path.join("data", "output")
+EXCEL_PATH   = os.path.join(OUT_DIR, "clean_statement.xlsx")
+TALLY_PATH   = os.path.join(OUT_DIR, "tally_import.csv")
+TALLY_XML    = os.path.join(OUT_DIR, "tally_import.xml")
 INSIGHTS_PATH = os.path.join(OUT_DIR, "financial_insights.md")
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Step 3 — Mathematical Validator
-# ---------------------------------------------------------------------------
+# Quarter → month labels for nicer sheet names
+_QUARTER_LABELS = {
+    "Q1": "Apr–Jun",
+    "Q2": "Jul–Sep",
+    "Q3": "Oct–Dec",
+    "Q4": "Jan–Mar",
+}
+
+# Financial year → start year for short label
+_FY_LABELS = {
+    "FY2324": "23",
+    "FY2425": "24",
+    "FY2526": "25",
+}
+
+
+def _infer_period_label(filename: str, df: pd.DataFrame = None) -> tuple[str, str]:
+    """
+    Return (period_label, sheet_name) from a filename.
+    Pattern: *_Q1_FY2324_* → ("Q1 FY2324", "Q1 Apr–Jun 23")
+    Falls back to date range if no match.
+    """
+    stem = os.path.basename(filename)
+    m = re.search(r"(Q[1-4])[\s_-]*(FY\d{4})", stem, re.IGNORECASE)
+    if m:
+        q   = m.group(1).upper()
+        fy  = m.group(2).upper()
+        qm  = _QUARTER_LABELS.get(q, "?")
+        yy  = _FY_LABELS.get(fy, fy[-2:])
+        period_label = f"{q} {fy}"
+        sheet_name   = f"{q} {qm} {yy}"
+        return period_label, sheet_name
+
+    # Fallback: derive from data date range
+    if df is not None and not df.empty and "Date" in df.columns:
+        d_min = df["Date"].min().strftime("%b %Y")
+        d_max = df["Date"].max().strftime("%b %Y")
+        label = f"{d_min}–{d_max}"
+        return label, label[:18]
+
+    return "FY2324", "Transactions"
+
+
+def _extract_single_pdf(pdf_file: str) -> list[dict]:
+    if args.extractor == "hdfc":
+        return HDFCPDFExtractor(pdf_file).extract() or []
+
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if not gemini_key:
+        print("      [!] GEMINI_API_KEY not set — falling back to HDFCPDFExtractor.")
+        return HDFCPDFExtractor(pdf_file).extract() or []
+
+    try:
+        data = UniversalPDFExtractor(pdf_file, api_key=gemini_key).extract()
+    except Exception as e:
+        print(f"      [Universal] Error: {e}")
+        data = None
+
+    if not data:
+        print("      [Universal] ⚠  0 rows — falling back to HDFCPDFExtractor...")
+        return HDFCPDFExtractor(pdf_file).extract() or []
+
+    return data
 
 
 def validate_balances(df: pd.DataFrame) -> bool:
-    """
-    Walks every row and verifies:
-        previous_balance - debit + credit  ≈  current_balance  (±₹0.01)
-
-    Opening balance is back-calculated from row 0:
-        opening = balance[0] + debit[0] - credit[0]
-    """
     TOLERANCE = 0.01
     prev_balance = df.iloc[0]["Balance"] + df.iloc[0]["Debit"] - df.iloc[0]["Credit"]
-
     for idx, row in df.iterrows():
         expected = prev_balance - row["Debit"] + row["Credit"]
-        actual = row["Balance"]
+        actual   = row["Balance"]
         if abs(expected - actual) > TOLERANCE:
             print(
                 f"\n      [VALIDATOR] ❌  Mismatch on row {idx} "
@@ -81,316 +133,297 @@ def validate_balances(df: pd.DataFrame) -> bool:
             )
             return False
         prev_balance = actual
-
     return True
 
 
 # ---------------------------------------------------------------------------
-# Step 5 — Output writers
+# Cross-quarter continuity check
 # ---------------------------------------------------------------------------
 
-
-def _save_excel(df: pd.DataFrame, path: str) -> None:
+def check_continuity(quarters: list[tuple]) -> list[dict]:
     """
-    Writes a two-sheet Excel workbook:
+    quarters: list of (period_label, df) sorted chronologically.
+    Returns a list of warning dicts.
+    """
+    warnings = []
+    TOLERANCE = 1.0  # ₹1 tolerance for rounding differences
 
-    Sheet 1 — "Transactions"
-        All 173 rows with columns:
-        Date | Narration | Clean_Description | CoA_Category |
-        Confidence_Score | Reasoning | Review_Required | Debit | Credit | Balance
+    print("\n  ┌─ Cross-Quarter Balance Continuity ─────────────────────────┐")
+    for i in range(len(quarters) - 1):
+        label_a, df_a = quarters[i]
+        label_b, df_b = quarters[i + 1]
 
-        Review_Required = TRUE when Confidence_Score < threshold OR category is Uncategorized.
-        CA workflow: filter Review_Required = TRUE → fix only those rows, ignore the rest.
+        closing  = float(df_a.iloc[-1]["Balance"])
+        opening  = float(df_b.iloc[0]["Balance"] + df_b.iloc[0]["Debit"] - df_b.iloc[0]["Credit"])
+        diff     = abs(closing - opening)
+        ok       = diff <= TOLERANCE
+        symbol   = "✅" if ok else "⚠️ "
+        print(
+            f"  │  {label_a} closing → {label_b} opening : "
+            f"₹{closing:>14,.2f} → ₹{opening:>14,.2f}  {symbol}"
+        )
+        if not ok:
+            warnings.append({
+                "from": label_a,
+                "to":   label_b,
+                "closing_balance":  round(closing, 2),
+                "opening_balance":  round(opening, 2),
+                "difference":       round(diff, 2),
+                "message": (
+                    f"{label_a} closing balance (₹{closing:,.2f}) does not match "
+                    f"{label_b} opening balance (₹{opening:,.2f}) — "
+                    f"gap of ₹{diff:,.2f}"
+                ),
+            })
+    print("  └─────────────────────────────────────────────────────────────┘")
+    return warnings
 
-    Sheet 2 — "Summary"
-        Financial totals by category + overall inflow/outflow/net.
-        This is what a CA looks at first before drilling into transactions.
+
+# ---------------------------------------------------------------------------
+# Excel — 7-sheet workbook
+# ---------------------------------------------------------------------------
+
+def _save_excel_multiperiod(quarters: list[tuple], combined_df: pd.DataFrame, path: str) -> None:
+    """
+    Writes a 7-sheet Excel workbook:
+      Q1 Apr–Jun 23 … Q4 Jan–Mar 24  (per-quarter sheets)
+      All Transactions               (combined + Period column)
+      Period Summary                  (Q1→Q4 trend table)
+      Annual Summary                  (full-year category totals)
     """
     try:
         import openpyxl
-        from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-        from openpyxl.utils import get_column_letter
+        from openpyxl.styles import PatternFill, Font, Alignment
     except ImportError:
-        print("      [!] openpyxl not installed. Run: pip install openpyxl")
-        sys.exit(1)
+        print("      [!] openpyxl not installed.")
+        return
 
-    # ── Build the transactions DataFrame ──────────────────────────────
-    out = df[
-        [
-            "Date",
-            "Narration",
-            "Clean_Description",
-            "CoA_Category",
-            "Confidence_Score",
-            "Reasoning",
-            "Debit",
-            "Credit",
-            "Balance",
-        ]
-    ].copy()
+    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=10)
+    quarter_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
+    green_fill   = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+    red_fill     = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+    review_fill  = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    title_font   = Font(bold=True, size=13, color="1F4E79")
+    bold_font    = Font(bold=True, size=10)
+    green_font   = Font(bold=True, color="375623", size=10)
+    red_font     = Font(bold=True, color="C00000", size=10)
 
-    out["Date"] = out["Date"].dt.strftime("%d/%m/%Y")
+    txn_cols = ["Date", "Narration", "Clean_Description", "CoA_Category",
+                "Confidence_Score", "Reasoning", "Review_Required", "Debit", "Credit", "Balance"]
+    col_widths = {"A": 12, "B": 45, "C": 28, "D": 26, "E": 16,
+                  "F": 40, "G": 16, "H": 14, "I": 14, "J": 14}
 
-    # Review_Required: True if confidence low OR category is Uncategorized
-    out["Review_Required"] = (df["Confidence_Score"] < CONFIDENCE_THRESHOLD) | (
-        df["CoA_Category"] == "Uncategorized"
-    )
+    def _style_txn_sheet(ws, df_sheet):
+        ws.freeze_panes = "A2"
+        for col, w in col_widths.items():
+            ws.column_dimensions[col].width = w
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        ws.row_dimensions[1].height = 30
+        flag_col_idx = txn_cols.index("Review_Required") + 1
+        for row_idx, rv in enumerate(df_sheet["Review_Required"], start=2):
+            if rv:
+                for ci in range(1, len(txn_cols) + 1):
+                    ws.cell(row=row_idx, column=ci).fill = review_fill
+                fc = ws.cell(row=row_idx, column=flag_col_idx)
+                fc.font = Font(bold=True, color="C00000")
+                fc.alignment = Alignment(horizontal="center")
 
-    # Reorder so Review_Required is visible right after CoA columns
-    out = out[
-        [
-            "Date",
-            "Narration",
-            "Clean_Description",
-            "CoA_Category",
-            "Confidence_Score",
-            "Reasoning",
-            "Review_Required",
-            "Debit",
-            "Credit",
-            "Balance",
-        ]
-    ]
-
-    # ── Build the summary DataFrame ───────────────────────────────────
-    summary_rows = []
-
-    # Per-category totals
-    for cat in sorted(df["CoA_Category"].unique()):
-        cat_df = df[df["CoA_Category"] == cat]
-        total_dr = cat_df["Debit"].sum()
-        total_cr = cat_df["Credit"].sum()
-        count = len(cat_df)
-        summary_rows.append(
-            {
-                "Category": cat,
-                "Txn Count": count,
-                "Total Debit": round(total_dr, 2),
-                "Total Credit": round(total_cr, 2),
-                "Net": round(total_cr - total_dr, 2),
-            }
+    def _prep_txn_df(df):
+        out = df[["Date","Narration","Clean_Description","CoA_Category",
+                   "Confidence_Score","Reasoning","Debit","Credit","Balance"]].copy()
+        out["Date"] = df["Date"].dt.strftime("%d/%m/%Y")
+        out["Review_Required"] = (
+            (df["Confidence_Score"] < CONFIDENCE_THRESHOLD) |
+            (df["CoA_Category"] == "Uncategorized")
         )
+        return out[txn_cols]
 
-    summary_df = pd.DataFrame(summary_rows)
-
-    # Overall totals row
-    overall = {
-        "Category": "── TOTAL ──",
-        "Txn Count": len(df),
-        "Total Debit": round(df["Debit"].sum(), 2),
-        "Total Credit": round(df["Credit"].sum(), 2),
-        "Net": round(df["Credit"].sum() - df["Debit"].sum(), 2),
-    }
-
-    # Opening / closing balance
-    opening_balance = df.iloc[0]["Balance"] + df.iloc[0]["Debit"] - df.iloc[0]["Credit"]
-    closing_balance = df.iloc[-1]["Balance"]
-
-    # Flagging stats
-    review_count = out["Review_Required"].sum()
-
-    # ── Write to Excel ────────────────────────────────────────────────
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
-        # Sheet 1 — Transactions
-        out.to_excel(writer, sheet_name="Transactions", index=False)
-        ws_txn = writer.sheets["Transactions"]
 
-        # Freeze header row
-        ws_txn.freeze_panes = "A2"
+        # ── Per-quarter sheets ─────────────────────────────────────────
+        for period_label, sheet_name, df_q in quarters:
+            out_q = _prep_txn_df(df_q)
+            out_q.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+            ws = writer.sheets[sheet_name[:31]]
+            _style_txn_sheet(ws, out_q)
 
-        # Column widths
-        col_widths = {
-            "A": 12,  # Date
-            "B": 45,  # Narration
-            "C": 28,  # Clean_Description
-            "D": 26,  # CoA_Category
-            "E": 16,  # Confidence_Score
-            "F": 40,  # Reasoning
-            "G": 16,  # Review_Required
-            "H": 14,  # Debit
-            "I": 14,  # Credit
-            "J": 14,  # Balance
+        # ── All Transactions sheet ─────────────────────────────────────
+        all_df = combined_df.copy()
+        all_df["Date"] = all_df["Date"].dt.strftime("%d/%m/%Y")
+        all_df["Review_Required"] = (
+            (combined_df["Confidence_Score"] < CONFIDENCE_THRESHOLD) |
+            (combined_df["CoA_Category"] == "Uncategorized")
+        )
+        all_cols = ["Date","Period","Narration","Clean_Description","CoA_Category",
+                    "Confidence_Score","Reasoning","Review_Required","Debit","Credit","Balance"]
+        all_df = all_df[all_cols]
+        all_df.to_excel(writer, sheet_name="All Transactions", index=False)
+        ws_all = writer.sheets["All Transactions"]
+        ws_all.freeze_panes = "A2"
+        all_col_widths = {"A":12,"B":14,"C":45,"D":28,"E":26,"F":16,"G":40,"H":16,"I":14,"J":14,"K":14}
+        for col, w in all_col_widths.items():
+            ws_all.column_dimensions[col].width = w
+        for cell in ws_all[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        ws_all.row_dimensions[1].height = 30
+
+        # ── Period Summary sheet ───────────────────────────────────────
+        ps_rows = []
+        for period_label, sheet_name, df_q in quarters:
+            opening = float(df_q.iloc[0]["Balance"] + df_q.iloc[0]["Debit"] - df_q.iloc[0]["Credit"])
+            closing = float(df_q.iloc[-1]["Balance"])
+            ps_rows.append({
+                "Period":          period_label,
+                "Date Range":      f"{df_q['Date'].min().strftime('%d %b %Y')} – {df_q['Date'].max().strftime('%d %b %Y')}",
+                "Transactions":    len(df_q),
+                "Total Inflow":    round(df_q["Credit"].sum(), 2),
+                "Total Outflow":   round(df_q["Debit"].sum(), 2),
+                "Net Cash Flow":   round(df_q["Credit"].sum() - df_q["Debit"].sum(), 2),
+                "Opening Balance": round(opening, 2),
+                "Closing Balance": round(closing, 2),
+            })
+
+        ps_df = pd.DataFrame(ps_rows)
+        ps_df.to_excel(writer, sheet_name="Period Summary", index=False, startrow=1)
+        ws_ps = writer.sheets["Period Summary"]
+        ws_ps["A1"] = "QUARTERLY PERIOD SUMMARY — FY2324"
+        ws_ps["A1"].font = title_font
+        ps_col_widths = {"A":14,"B":28,"C":14,"D":16,"E":16,"F":16,"G":18,"H":18}
+        for col, w in ps_col_widths.items():
+            ws_ps.column_dimensions[col].width = w
+        for cell in ws_ps[2]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws_ps.row_dimensions[2].height = 28
+        # Colour net flow cells
+        net_col_idx = list(ps_df.columns).index("Net Cash Flow") + 1
+        for r_idx, val in enumerate(ps_df["Net Cash Flow"], start=3):
+            cell = ws_ps.cell(row=r_idx, column=net_col_idx)
+            cell.fill = green_fill if val >= 0 else red_fill
+            cell.font = Font(bold=True, color="375623" if val >= 0 else "C00000", size=10)
+
+        # Bold totals row at bottom
+        total_row = len(ps_rows) + 3
+        totals = {
+            "Period": "── ANNUAL TOTAL ──",
+            "Transactions": combined_df.shape[0],
+            "Total Inflow": round(combined_df["Credit"].sum(), 2),
+            "Total Outflow": round(combined_df["Debit"].sum(), 2),
+            "Net Cash Flow": round(combined_df["Credit"].sum() - combined_df["Debit"].sum(), 2),
         }
-        for col, width in col_widths.items():
-            ws_txn.column_dimensions[col].width = width
+        for c_idx, col_name in enumerate(ps_df.columns, start=1):
+            cell = ws_ps.cell(row=total_row, column=c_idx)
+            cell.value = totals.get(col_name, "")
+            cell.font  = bold_font
+            total_fill_c = PatternFill(start_color="D6E4F0", end_color="D6E4F0", fill_type="solid")
+            cell.fill  = total_fill_c
 
-        # Style header row
-        header_fill = PatternFill(
-            start_color="1F4E79", end_color="1F4E79", fill_type="solid"
-        )
-        header_font = Font(bold=True, color="FFFFFF", size=10)
-        for cell in ws_txn[1]:
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = Alignment(
-                horizontal="center", vertical="center", wrap_text=True
+        # ── Annual Summary sheet ───────────────────────────────────────
+        sum_rows = []
+        for cat in sorted(combined_df["CoA_Category"].unique()):
+            cat_df = combined_df[combined_df["CoA_Category"] == cat]
+            sum_rows.append({
+                "Category":     cat,
+                "Txn Count":    len(cat_df),
+                "Total Debit":  round(cat_df["Debit"].sum(), 2),
+                "Total Credit": round(cat_df["Credit"].sum(), 2),
+                "Net":          round(cat_df["Credit"].sum() - cat_df["Debit"].sum(), 2),
+            })
+        sum_df = pd.DataFrame(sum_rows)
+
+        opening_bal = float(combined_df.sort_values("Date").iloc[0]["Balance"] +
+                           combined_df.sort_values("Date").iloc[0]["Debit"] -
+                           combined_df.sort_values("Date").iloc[0]["Credit"])
+        closing_bal = float(combined_df.sort_values("Date").iloc[-1]["Balance"])
+
+        sum_df.to_excel(writer, sheet_name="Annual Summary", index=False, startrow=6)
+        ws_ann = writer.sheets["Annual Summary"]
+        ws_ann["A1"] = "ANNUAL FINANCIAL SUMMARY — FY 2023–24"
+        ws_ann["A1"].font = title_font
+        for col, w in {"A":28,"B":12,"C":16,"D":16,"E":14}.items():
+            ws_ann.column_dimensions[col].width = w
+
+        kv = [
+            ("Opening Balance", f"₹{opening_bal:,.2f}"),
+            ("Closing Balance", f"₹{closing_bal:,.2f}"),
+            ("Total Inflow",    f"₹{combined_df['Credit'].sum():,.2f}"),
+            ("Total Outflow",   f"₹{combined_df['Debit'].sum():,.2f}"),
+            ("Net Cash Flow",   f"₹{combined_df['Credit'].sum() - combined_df['Debit'].sum():,.2f}"),
+        ]
+        for i, (lbl, val) in enumerate(kv, start=2):
+            ws_ann.cell(row=i, column=1).value = lbl
+            ws_ann.cell(row=i, column=1).font  = bold_font
+            ws_ann.cell(row=i, column=2).value = val
+            net = combined_df["Credit"].sum() - combined_df["Debit"].sum()
+            ws_ann.cell(row=i, column=2).font = (
+                green_font if lbl == "Net Cash Flow" and net >= 0
+                else red_font  if lbl == "Net Cash Flow"
+                else Font(size=10)
             )
-
-        ws_txn.row_dimensions[1].height = 30
-
-        # Highlight Review_Required = True rows in yellow
-        review_fill = PatternFill(
-            start_color="FFF2CC", end_color="FFF2CC", fill_type="solid"
-        )
-        flag_col_idx = out.columns.get_loc("Review_Required") + 1  # 1-indexed
-
-        for row_idx, row_val in enumerate(out["Review_Required"], start=2):
-            if row_val:
-                for col_idx in range(1, len(out.columns) + 1):
-                    ws_txn.cell(row=row_idx, column=col_idx).fill = review_fill
-                # Also make the Review_Required cell itself red-bold
-                flag_cell = ws_txn.cell(row=row_idx, column=flag_col_idx)
-                flag_cell.font = Font(bold=True, color="C00000")
-                flag_cell.alignment = Alignment(horizontal="center")
-
-        # Sheet 2 — Summary
-        summary_df.to_excel(writer, sheet_name="Summary", index=False, startrow=6)
-        ws_sum = writer.sheets["Summary"]
-        ws_sum.column_dimensions["A"].width = 28
-        ws_sum.column_dimensions["B"].width = 12
-        ws_sum.column_dimensions["C"].width = 16
-        ws_sum.column_dimensions["D"].width = 16
-        ws_sum.column_dimensions["E"].width = 14
-
-        # Header block at the top of Summary sheet
-        title_font = Font(bold=True, size=13, color="1F4E79")
-        label_font = Font(bold=True, size=10)
-        value_font = Font(size=10)
-        green_font = Font(bold=True, color="375623", size=10)
-        red_font = Font(bold=True, color="C00000", size=10)
-
-        ws_sum["A1"] = "FINANCIAL SUMMARY"
-        ws_sum["A1"].font = title_font
-
-        kv_rows = [
-            ("Opening Balance", f"₹{opening_balance:,.2f}"),
-            ("Closing Balance", f"₹{closing_balance:,.2f}"),
-            ("Total Inflow", f"₹{df['Credit'].sum():,.2f}"),
-            ("Total Outflow", f"₹{df['Debit'].sum():,.2f}"),
-            ("Net Cash Flow", f"₹{df['Credit'].sum() - df['Debit'].sum():,.2f}"),
-            ("Transactions", str(len(df))),
-            ("Flagged for Review", str(int(review_count))),
-        ]
-
-        for i, (label, value) in enumerate(kv_rows, start=2):
-            ws_sum.cell(row=i, column=1).value = label
-            ws_sum.cell(row=i, column=1).font = label_font
-            ws_sum.cell(row=i, column=2).value = value
-            # Colour net cash flow green/red
-            if label == "Net Cash Flow":
-                net_val = df["Credit"].sum() - df["Debit"].sum()
-                ws_sum.cell(row=i, column=2).font = (
-                    green_font if net_val >= 0 else red_font
-                )
-            elif label == "Flagged for Review" and review_count > 0:
-                ws_sum.cell(row=i, column=2).font = red_font
-            else:
-                ws_sum.cell(row=i, column=2).font = value_font
-
-        # Style the category breakdown table header (row 7)
-        for cell in ws_sum[7]:
+        for cell in ws_ann[7]:
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center")
 
-        # Total row at the bottom of the category table
-        total_row_idx = 7 + len(summary_df) + 1
-        total_fill = PatternFill(
-            start_color="D6E4F0", end_color="D6E4F0", fill_type="solid"
-        )
-        total_data = [
-            overall["Category"],
-            overall["Txn Count"],
-            overall["Total Debit"],
-            overall["Total Credit"],
-            overall["Net"],
-        ]
-        for col_idx, val in enumerate(total_data, start=1):
-            cell = ws_sum.cell(row=total_row_idx, column=col_idx)
-            cell.value = val
-            cell.fill = total_fill
-            cell.font = Font(bold=True, size=10)
-            cell.alignment = Alignment(horizontal="center")
-
-    print(f"      ✅  Excel  → {path}  ({int(review_count)} rows flagged for review)")
+    review_count = int(
+        ((combined_df["Confidence_Score"] < CONFIDENCE_THRESHOLD) |
+         (combined_df["CoA_Category"] == "Uncategorized")).sum()
+    )
+    print(f"      ✅  Excel (7 sheets) → {path}  ({review_count} rows flagged)")
 
 
 def _save_tally_csv(df: pd.DataFrame, path: str) -> None:
-    """
-    Tally-ready CSV — clean data only, no review flags.
-    Columns: Date | Voucher_Type | Ledger_Name | CoA_Category | Amount
-    """
     tally = df[["Date", "Clean_Description", "CoA_Category", "Debit", "Credit"]].copy()
     tally["Date"] = df["Date"].dt.strftime("%d/%m/%Y")
-    tally["Voucher_Type"] = tally.apply(
-        lambda r: "Payment" if r["Debit"] > 0 else "Receipt", axis=1
-    )
-    tally["Amount"] = tally.apply(
-        lambda r: r["Debit"] if r["Debit"] > 0 else r["Credit"], axis=1
-    )
+    tally["Voucher_Type"] = tally.apply(lambda r: "Payment" if r["Debit"] > 0 else "Receipt", axis=1)
+    tally["Amount"] = tally.apply(lambda r: r["Debit"] if r["Debit"] > 0 else r["Credit"], axis=1)
     tally = tally.rename(columns={"Clean_Description": "Ledger_Name"})
-    tally = tally[["Date", "Voucher_Type", "Ledger_Name", "CoA_Category", "Amount"]]
-    tally.to_csv(path, index=False)
+    if "Period" in df.columns:
+        tally["Period"] = df["Period"]
+    tally[["Date", "Voucher_Type", "Ledger_Name", "CoA_Category", "Amount"]].to_csv(path, index=False)
     print(f"      ✅  Tally CSV → {path}")
 
 
 def _save_tally_xml(df: pd.DataFrame, path: str) -> None:
-    """
-    Tally-ready exact XML structure for 1-click voucher import.
-    """
     import xml.etree.ElementTree as ET
     from xml.dom import minidom
 
-    envelope = ET.Element("ENVELOPE")
-    header = ET.SubElement(envelope, "HEADER")
+    envelope  = ET.Element("ENVELOPE")
+    header    = ET.SubElement(envelope, "HEADER")
     ET.SubElement(header, "TALLYREQUEST").text = "Import Data"
-
-    body = ET.SubElement(envelope, "BODY")
+    body      = ET.SubElement(envelope, "BODY")
     importdata = ET.SubElement(body, "IMPORTDATA")
-
-    reqdesc = ET.SubElement(importdata, "REQUESTDESC")
+    reqdesc   = ET.SubElement(importdata, "REQUESTDESC")
     ET.SubElement(reqdesc, "REPORTNAME").text = "Vouchers"
     staticvars = ET.SubElement(reqdesc, "STATICVARIABLES")
     ET.SubElement(staticvars, "SVCURRENTCOMPANY").text = "My Company"
-
-    reqdata = ET.SubElement(importdata, "REQUESTDATA")
+    reqdata   = ET.SubElement(importdata, "REQUESTDATA")
 
     for _, row in df.iterrows():
         if row["Debit"] == 0 and row["Credit"] == 0:
             continue
-
-        tmsg = ET.SubElement(reqdata, "TALLYMESSAGE", {"xmlns:UDF": "TallyUDF"})
+        tmsg    = ET.SubElement(reqdata, "TALLYMESSAGE", {"xmlns:UDF": "TallyUDF"})
         vchtype = "Payment" if row["Debit"] > 0 else "Receipt"
-        amt = row["Debit"] if row["Debit"] > 0 else row["Credit"]
-
-        voucher = ET.SubElement(
-            tmsg, "VOUCHER", {"VCHTYPE": vchtype, "ACTION": "Create"}
-        )
+        amt     = row["Debit"] if row["Debit"] > 0 else row["Credit"]
+        voucher = ET.SubElement(tmsg, "VOUCHER", {"VCHTYPE": vchtype, "ACTION": "Create"})
         ET.SubElement(voucher, "DATE").text = row["Date"].strftime("%Y%m%d")
         ET.SubElement(voucher, "VOUCHERTYPENAME").text = vchtype
         ET.SubElement(voucher, "NARRATION").text = str(row.get("Clean_Description", ""))
-
-        # Party Ledger (The vendor / sender)
-        party_list = ET.SubElement(voucher, "ALLLEDGERENTRIES.LIST")
-        ET.SubElement(party_list, "LEDGERNAME").text = str(
-            row.get("Clean_Description", "")
-        )
-        ET.SubElement(party_list, "ISDEEMEDPOSITIVE").text = (
-            "Yes" if vchtype == "Payment" else "No"
-        )
-        ET.SubElement(party_list, "AMOUNT").text = (
-            f"-{amt}" if vchtype == "Payment" else f"{amt}"
-        )
-
-        # Bank Ledger
-        bank_list = ET.SubElement(voucher, "ALLLEDGERENTRIES.LIST")
-        ET.SubElement(bank_list, "LEDGERNAME").text = "HDFC Bank"
-        ET.SubElement(bank_list, "ISDEEMEDPOSITIVE").text = (
-            "No" if vchtype == "Payment" else "Yes"
-        )
-        ET.SubElement(bank_list, "AMOUNT").text = (
-            f"{amt}" if vchtype == "Payment" else f"-{amt}"
-        )
+        party = ET.SubElement(voucher, "ALLLEDGERENTRIES.LIST")
+        ET.SubElement(party, "LEDGERNAME").text = str(row.get("Clean_Description", ""))
+        ET.SubElement(party, "ISDEEMEDPOSITIVE").text = "Yes" if vchtype == "Payment" else "No"
+        ET.SubElement(party, "AMOUNT").text = f"-{amt}" if vchtype == "Payment" else f"{amt}"
+        bank = ET.SubElement(voucher, "ALLLEDGERENTRIES.LIST")
+        ET.SubElement(bank, "LEDGERNAME").text = "HDFC Bank"
+        ET.SubElement(bank, "ISDEEMEDPOSITIVE").text = "No" if vchtype == "Payment" else "Yes"
+        ET.SubElement(bank, "AMOUNT").text = f"{amt}" if vchtype == "Payment" else f"-{amt}"
 
     xml_str = minidom.parseString(ET.tostring(envelope)).toprettyxml(indent="  ")
     with open(path, "w", encoding="utf-8") as f:
@@ -402,223 +435,226 @@ def _save_tally_xml(df: pd.DataFrame, path: str) -> None:
 # Pipeline
 # ---------------------------------------------------------------------------
 
-
 def run_pipeline() -> None:
     global PDF_PATH
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    print("\n[0/6] Initializing database...")
+    print("\n[0/7] Initializing database (applying additive migrations)...")
     init_db()
 
-    # ── Step 1: Extract ──────────────────────────────────────────────────
-    print(f"\n[1/6] Extracting raw transactions from '{PDF_PATH}'...")
-    print(f"      Engine : {args.extractor.upper()}")
-    if not os.path.exists(PDF_PATH):
-        print(f"      [!] Path not found at '{PDF_PATH}'. Aborting.")
-        sys.exit(1)
+    # ── Step 1: Collect PDF files ─────────────────────────────────────────
+    print(f"\n[1/7] Locating PDF files in '{PDF_PATH}'...")
 
-    raw_data = []
-
-    # ── Helper: extract one PDF using the requested engine (with fallback) ──
-    def _extract_single_pdf(pdf_file: str) -> list[dict]:
-        """
-        Extract one PDF file using the selected engine.
-        - 'universal' mode: tries UniversalPDFExtractor first;
-           if it returns 0 rows or fails, falls back to HDFCPDFExtractor.
-        - 'hdfc' mode: uses HDFCPDFExtractor directly (no API call).
-        Returns a list[dict] (may be empty).
-        """
-        if args.extractor == "hdfc":
-            data = HDFCPDFExtractor(pdf_file).extract()
-            return data or []
-
-        # --- Universal mode ---
-        gemini_key = os.getenv("GEMINI_API_KEY")
-        if not gemini_key:
-            print(
-                "      [!] GEMINI_API_KEY not set — cannot use universal extractor.\n"
-                "          Falling back to HDFCPDFExtractor (HDFC statements only)."
-            )
-            data = HDFCPDFExtractor(pdf_file).extract()
-            return data or []
-
-        try:
-            data = UniversalPDFExtractor(pdf_file, api_key=gemini_key).extract()
-        except Exception as e:
-            print(f"      [Universal] Error: {e}")
-            data = None
-
-        if not data:
-            print(
-                "      [Universal] ⚠  0 rows — falling back to HDFCPDFExtractor..."
-            )
-            data = HDFCPDFExtractor(pdf_file).extract()
-            return data or []
-
-        return data
-
-    if os.path.isdir(PDF_PATH):
-        # If the default pdfs folder is explicitly empty, check the images folder as a convenience fallback
-        if PDF_PATH == os.path.join("data", "input", "pdfs") and not os.listdir(
-            PDF_PATH
-        ):
-            fallback_path = os.path.join("data", "input", "images")
-            if os.path.exists(fallback_path) and any(
-                f.lower().endswith((".jpg", ".jpeg", ".png", ".heic"))
-                for f in os.listdir(fallback_path)
-            ):
-                print(
-                    f"      [!] '{PDF_PATH}' is empty. Falling back to '{fallback_path}'."
-                )
-                PDF_PATH = fallback_path
-
-        # Folder Mode (Image or PDF)
-        valid_img_exts = {".jpg", ".jpeg", ".png", ".heic"}
-        image_files = [
-            os.path.join(PDF_PATH, f)
-            for f in os.listdir(PDF_PATH)
-            if os.path.splitext(f.lower())[1] in valid_img_exts
-        ]
-        pdf_files = [
+    if os.path.isfile(PDF_PATH):
+        pdf_files = [PDF_PATH]
+    elif os.path.isdir(PDF_PATH):
+        pdf_files = sorted([
             os.path.join(PDF_PATH, f)
             for f in os.listdir(PDF_PATH)
             if f.lower().endswith(".pdf")
-        ]
-
-        if image_files:
-            print(f"      [OCR] Found {len(image_files)} image files in {PDF_PATH}.")
-            from core.extractors.image_ocr import ImageOCRExtractor
-
-            extractor = ImageOCRExtractor(image_paths=image_files)
-            raw_data = extractor.extract() or []
-        elif pdf_files:
-            print(
-                f"      Found {len(pdf_files)} PDF file(s) in {PDF_PATH}. Processing sequentially..."
-            )
-            for pf in sorted(pdf_files):
-                print(f"            → Extracting {os.path.basename(pf)}...")
-                ext_data = _extract_single_pdf(pf)
-                if ext_data:
-                    raw_data.extend(ext_data)
-        else:
-            print(
-                f"      [!] No valid image or PDF files found in '{PDF_PATH}'. Aborting."
-            )
+        ])
+        if not pdf_files:
+            # Fallback to images folder
+            img_dir = os.path.join("data", "input", "images")
+            img_exts = {".jpg", ".jpeg", ".png", ".heic"}
+            if os.path.exists(img_dir):
+                img_files = [os.path.join(img_dir, f) for f in os.listdir(img_dir)
+                             if os.path.splitext(f.lower())[1] in img_exts]
+                if img_files:
+                    print(f"      [!] No PDFs found. Falling back to image OCR: {img_dir}")
+                    from core.extractors.image_ocr import ImageOCRExtractor
+                    raw = ImageOCRExtractor(image_paths=img_files).extract() or []
+                    if not raw:
+                        print("      [!] OCR returned no data. Aborting.")
+                        sys.exit(1)
+                    clean_df  = HDFCDataCleaner(raw).clean()
+                    safe_df   = DataSanitizer(clean_df).scrub_pii()
+                    safe_df["CoA_Category"]     = "Uncategorized"
+                    safe_df["Confidence_Score"] = 0
+                    safe_df["Reasoning"]        = "Image OCR — no CoA."
+                    _save_tally_csv(safe_df, TALLY_PATH)
+                    _save_tally_xml(safe_df, TALLY_XML)
+                    upsert_transactions(safe_df)
+                    return
+            print(f"      [!] No PDF files found in '{PDF_PATH}'. Aborting.")
             sys.exit(1)
     else:
-        # Standard Single File Extractor
-        if PDF_PATH.lower().endswith(".pdf"):
-            raw_data = _extract_single_pdf(PDF_PATH)
-        else:
-            print(f"      [!] File {PDF_PATH} is not a PDF. Aborting.")
-            sys.exit(1)
-
-    if not raw_data:
-        print("      [!] Extraction returned no data. Aborting.")
+        print(f"      [!] Path not found: '{PDF_PATH}'. Aborting.")
         sys.exit(1)
-    print(f"      → {len(raw_data)} rows extracted.")
 
-    # ── Step 1.5: Validate extraction quality ────────────────────────────
-    print("\n[1.5/6] Validating extraction quality...")
-    val_result = ExtractionValidator(raw_data).validate()
-    print(val_result.report())
-    if not val_result.passed:
-        print(
-            "      [!] Extraction validation FAILED. "
-            "The data is not safe to process. Aborting.\n"
-            "      Tip: Try running with '--extractor hdfc' if this is an HDFC statement, "
-            "or check that the PDF contains a standard bank transaction table."
-        )
-        sys.exit(1)
-    print("      ✅  Extraction validation passed.")
+    print(f"      Found {len(pdf_files)} PDF file(s): {[os.path.basename(p) for p in pdf_files]}")
+    multi_mode = len(pdf_files) > 1
 
-    # ── Step 2: Clean ────────────────────────────────────────────────────
-    print("\n[2/6] Cleaning narrations and coercing numbers...")
-    clean_df = HDFCDataCleaner(raw_data).clean()
-    print(f"      → {len(clean_df)} rows | null dates: {clean_df['Date'].isna().sum()}")
-
-    # ── Step 3: Validate ─────────────────────────────────────────────────
-    print("\n[3/6] Validating balance integrity...")
-    if not validate_balances(clean_df):
-        print("\n      [!] Validation FAILED — fix extraction before proceeding.")
-        sys.exit(1)
-    print(f"      → All {len(clean_df)} balances verified ✅")
-
-    # ── Step 4: Scrub PII ────────────────────────────────────────────────
-    print("\n[4/6] Scrubbing PII and building Clean_Description...")
-    safe_df = DataSanitizer(clean_df).scrub_pii()
-    sample = safe_df[["Narration", "Clean_Description"]].drop_duplicates().head(5)
-    for _, row in sample.iterrows():
-        print(f"      {row['Narration'][:42]:<42}  →  {row['Clean_Description']}")
-
-    # ── Step 4.5: CoA Categorisation + Confidence Scoring ────────────────
-    print("\n[4.5/6] Categorising via Groq LLM (with confidence scoring)...")
+    # ── Step 1.5 → Validate + Clean + CoA per PDF ───────────────────────
     groq_api_key = os.getenv("GROQ_API_KEY")
+    quarters: list[tuple] = []   # (period_label, sheet_name, clean_safe_df)
 
-    if not groq_api_key:
-        print(
-            "      [!] GROQ_API_KEY not set in .env — skipping LLM categorisation.\n"
-            "          All rows will be marked Uncategorized / Review_Required = True."
-        )
-        safe_df["CoA_Category"] = "Uncategorized"
-        safe_df["Confidence_Score"] = 0
-        safe_df["Reasoning"] = "GROQ_API_KEY not configured."
+    for pdf_file in pdf_files:
+        fname = os.path.basename(pdf_file)
+        print(f"\n  ── Processing: {fname}")
+
+        # Extract
+        raw_data = _extract_single_pdf(pdf_file)
+        if not raw_data:
+            print(f"      [!] Extraction returned no data for {fname}. Skipping.")
+            continue
+        print(f"      → {len(raw_data)} raw rows extracted.")
+
+        # Validate extraction
+        val = ExtractionValidator(raw_data).validate()
+        print(val.report())
+        if not val.passed:
+            print(f"      [⚠] Extraction validation failed for {fname}. Skipping.")
+            continue
+
+        # Clean
+        clean_df = HDFCDataCleaner(raw_data).clean()
+        if clean_df.empty:
+            print(f"      [!] Clean step produced 0 rows for {fname}. Skipping.")
+            continue
+
+        # Sanitize PII
+        safe_df = DataSanitizer(clean_df).scrub_pii()
+
+        # CoA categorize
+        if groq_api_key:
+            safe_df = CoAMapper(api_key=groq_api_key).map(safe_df)
+        else:
+            safe_df["CoA_Category"]     = "Uncategorized"
+            safe_df["Confidence_Score"] = 0
+            safe_df["Reasoning"]        = "GROQ_API_KEY not set."
+
+        # Infer period label from filename
+        period_label, sheet_name = _infer_period_label(pdf_file, safe_df)
+        safe_df["Period"]       = period_label
+        safe_df["Source_File"]  = fname
+
+        quarters.append((period_label, sheet_name, safe_df))
+        print(f"      ✅  {period_label} ({sheet_name}): {len(safe_df)} rows tagged.")
+
+    if not quarters:
+        print("\n[!] No valid data extracted from any PDF. Aborting.")
+        sys.exit(1)
+
+    # Sort quarters chronologically by first date in each df
+    quarters.sort(key=lambda t: t[2]["Date"].min())
+
+    # ── Step 1.6: Cross-quarter continuity check ─────────────────────────
+    print("\n[1.6/7] Cross-quarter balance continuity check...")
+    continuity_pairs = [(q[0], q[2]) for q in quarters]
+    continuity_warnings = check_continuity(continuity_pairs) if len(quarters) > 1 else []
+    if not continuity_warnings:
+        print("      ✅  All quarter balances chain correctly.")
     else:
-        mapper = CoAMapper(api_key=groq_api_key)
-        safe_df = mapper.map(safe_df)
+        print(f"      ⚠️   {len(continuity_warnings)} continuity gap(s) detected (non-fatal).")
 
-    # ── Step 5: Save outputs ─────────────────────────────────────────────
-    print("\n[5/6] Writing output files and updating database...")
-    _save_excel(safe_df, EXCEL_PATH)
-    _save_tally_csv(safe_df, TALLY_PATH)
-    _save_tally_xml(safe_df, TALLY_XML_PATH)
+    # ── Step 5: Save outputs ──────────────────────────────────────────────
+    print("\n[5/7] Writing output files and updating database...")
 
-    new_rows = upsert_transactions(safe_df)
-    print(f"      ✅  Database → Inserted {new_rows} new transactions.")
+    # Combined DataFrame (with Period column)
+    combined_df = pd.concat([q[2] for q in quarters], ignore_index=True)
+    combined_df = combined_df.sort_values("Date").reset_index(drop=True)
 
-    # ── Step 6: Generate Insights ────────────────────────────────────────
-    print("\n[6/6] Generating financial insights from full history...")
+    if multi_mode:
+        _save_excel_multiperiod(quarters, combined_df, EXCEL_PATH)
+    else:
+        # Single-file path: use original simple Excel writer
+        _save_excel_single(quarters[0][2], EXCEL_PATH)
+
+    _save_tally_csv(combined_df, TALLY_PATH)
+    _save_tally_xml(combined_df, TALLY_XML)
+
+    # DB upsert per quarter
+    total_new = 0
+    for period_label, sheet_name, df_q in quarters:
+        source_file  = df_q["Source_File"].iloc[0] if "Source_File" in df_q.columns else "UNKNOWN"
+        new_rows = upsert_transactions(df_q, source_file=source_file, period_label=period_label)
+        total_new += new_rows
+        print(f"      DB ← {period_label}: {new_rows} new rows inserted.")
+    print(f"      ✅  Database → {total_new} total new transactions.")
+
+    # ── Step 6: Insights ─────────────────────────────────────────────────
+    print("\n[6/7] Generating financial insights from full history...")
     try:
-        generator = InsightsGenerator()
-        generator.generate_insights(INSIGHTS_PATH)
+        InsightsGenerator().generate_insights(INSIGHTS_PATH)
     except Exception as e:
-        print(f"      [Insights] Initialization failed: {e}")
+        print(f"      [Insights] Error: {e}")
 
-    # ── Step 7: Frontend Data Export ─────────────────────────────────────
-    print("\n[7/7] Generating frontend API json...")
+    # ── Step 7: Frontend JSON ────────────────────────────────────────────
+    print("\n[7/7] Generating frontend API JSON...")
     try:
-        fe_engine = FrontendDataEngine()
-        fe_engine.generate()
+        fe = FrontendDataEngine()
+        fe.generate()
     except Exception as e:
-        print(f"      [FrontendDataEngine] Initialization failed: {e}")
+        print(f"      [FrontendDataEngine] Error: {e}")
 
     # ── Terminal summary ─────────────────────────────────────────────────
-    review_count = int(
-        (
-            (safe_df["Confidence_Score"] < CONFIDENCE_THRESHOLD)
-            | (safe_df["CoA_Category"] == "Uncategorized")
-        ).sum()
-    )
-
-    print(f"\n{'─' * 58}")
-    print(f"  Pipeline complete — {len(safe_df)} transactions processed")
-    print(
-        f"  Opening balance : ₹{clean_df.iloc[0]['Balance'] + clean_df.iloc[0]['Debit'] - clean_df.iloc[0]['Credit']:>12,.2f}"
-    )
-    print(f"  Total inflow    : ₹{clean_df['Credit'].sum():>12,.2f}")
-    print(f"  Total outflow   : ₹{clean_df['Debit'].sum():>12,.2f}")
-    net = clean_df["Credit"].sum() - clean_df["Debit"].sum()
-    print(f"  Net cash flow   : ₹{net:>12,.2f}  {'▲' if net >= 0 else '▼'}")
-    print(f"  Closing balance : ₹{clean_df.iloc[-1]['Balance']:>12,.2f}")
-    print(
-        f"  Flagged rows    : {review_count}  (Confidence < {CONFIDENCE_THRESHOLD}% or Uncategorized)"
-    )
-    print(f"\n  Category breakdown:")
-    for cat, count in safe_df["CoA_Category"].value_counts().items():
-        bar = "█" * min(count, 30)
-        print(f"    {cat:<28} {count:>4}  {bar}")
+    net = combined_df["Credit"].sum() - combined_df["Debit"].sum()
+    print(f"\n{'─' * 62}")
+    print(f"  Pipeline complete — {len(combined_df)} transactions across {len(quarters)} period(s)")
+    print(f"  Period(s)       : {', '.join(q[0] for q in quarters)}")
+    print(f"  Total Inflow    : ₹{combined_df['Credit'].sum():>14,.2f}")
+    print(f"  Total Outflow   : ₹{combined_df['Debit'].sum():>14,.2f}")
+    print(f"  Net Cash Flow   : ₹{net:>14,.2f}  {'▲' if net >= 0 else '▼'}")
+    print(f"  Closing Balance : ₹{combined_df.iloc[-1]['Balance']:>14,.2f}")
+    if continuity_warnings:
+        print(f"\n  ⚠️  Continuity warnings:")
+        for w in continuity_warnings:
+            print(f"     • {w['message']}")
     print(f"\n  Output : {os.path.abspath(OUT_DIR)}")
-    print(f"{'─' * 58}\n")
+    print(f"{'─' * 62}\n")
+
+
+# ---------------------------------------------------------------------------
+# Single-file Excel (unchanged logic, kept for backward compatibility)
+# ---------------------------------------------------------------------------
+
+def _save_excel_single(df: pd.DataFrame, path: str) -> None:
+    try:
+        import openpyxl
+        from openpyxl.styles import PatternFill, Font, Alignment
+    except ImportError:
+        return
+
+    out = df[["Date","Narration","Clean_Description","CoA_Category",
+              "Confidence_Score","Reasoning","Debit","Credit","Balance"]].copy()
+    out["Date"] = df["Date"].dt.strftime("%d/%m/%Y")
+    out["Review_Required"] = (
+        (df["Confidence_Score"] < CONFIDENCE_THRESHOLD) |
+        (df["CoA_Category"] == "Uncategorized")
+    )
+    out = out[["Date","Narration","Clean_Description","CoA_Category",
+               "Confidence_Score","Reasoning","Review_Required","Debit","Credit","Balance"]]
+
+    summary_rows = []
+    for cat in sorted(df["CoA_Category"].unique()):
+        cdf = df[df["CoA_Category"] == cat]
+        summary_rows.append({"Category": cat, "Txn Count": len(cdf),
+                              "Total Debit": round(cdf["Debit"].sum(), 2),
+                              "Total Credit": round(cdf["Credit"].sum(), 2),
+                              "Net": round(cdf["Credit"].sum() - cdf["Debit"].sum(), 2)})
+    sum_df = pd.DataFrame(summary_rows)
+
+    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=10)
+
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        out.to_excel(writer, sheet_name="Transactions", index=False)
+        ws = writer.sheets["Transactions"]
+        ws.freeze_panes = "A2"
+        for col, w in {"A":12,"B":45,"C":28,"D":26,"E":16,"F":40,"G":16,"H":14,"I":14,"J":14}.items():
+            ws.column_dimensions[col].width = w
+        for cell in ws[1]:
+            cell.fill = header_fill; cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        ws.row_dimensions[1].height = 30
+
+        sum_df.to_excel(writer, sheet_name="Summary", index=False, startrow=2)
+        ws2 = writer.sheets["Summary"]
+        ws2["A1"] = "Annual Summary"
+        ws2["A1"].font = Font(bold=True, size=13, color="1F4E79")
+
+    print(f"      ✅  Excel → {path}")
 
 
 if __name__ == "__main__":

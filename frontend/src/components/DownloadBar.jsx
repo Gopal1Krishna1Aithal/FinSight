@@ -52,6 +52,15 @@ const DownloadBar = ({ onShowInsights }) => {
           <span>{xmlLoading ? 'Downloading…' : 'Tally XML'}</span>
         </button>
 
+        <button
+          className="dl-btn"
+          onClick={() => triggerDownload('http://127.0.0.1:8000/api/download/excel/', 'clean_statement.xlsx', () => {})}
+          id="dl-excel-btn"
+        >
+          <FileSpreadsheet size={20} />
+          <span>Annual Excel</span>
+        </button>
+
         <button className="dl-btn insights" onClick={onShowInsights} id="view-insights-btn">
           <Brain size={20} />
           <span>View Insights</span>

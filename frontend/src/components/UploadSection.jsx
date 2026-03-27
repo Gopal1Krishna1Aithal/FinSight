@@ -33,7 +33,9 @@ const UploadSection = ({ onResults, onLoading }) => {
 
     try {
       const formData = new FormData();
-      formData.append('file', files[0]);
+      files.forEach(f => {
+        formData.append('file', f);
+      });
 
       const res = await fetch('http://127.0.0.1:8000/api/upload/', {
         method: 'POST',

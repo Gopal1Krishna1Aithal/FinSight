@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { X, FileText, Printer, Download } from 'lucide-react';
 
 const InsightsPanel = ({ onClose }) => {
@@ -85,7 +84,7 @@ const InsightsPanel = ({ onClose }) => {
           {content && (
             <div style={{ maxWidth: '680px', margin: '0 auto' }}>
               <div id="insights-content" className="markdown-body">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+                <ReactMarkdown>{content}</ReactMarkdown>
               </div>
             </div>
           )}

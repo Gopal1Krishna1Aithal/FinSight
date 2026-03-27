@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import UploadSection from './components/UploadSection';
 import InsightsDashboard from './components/InsightsDashboard';
 import TrendChart from './components/TrendChart';
@@ -10,6 +10,14 @@ function App() {
   const [results, setResults]       = useState(null);
   const [loading, setLoading]       = useState(false);
   const [showInsights, setShowInsights] = useState(false);
+
+  useEffect(() => {
+    // Attempt to load current cumulative database state on boot
+    fetch('http://127.0.0.1:8000/api/dashboard/')
+      .then(res => { if (res.ok) return res.json(); })
+      .then(data => { if (data) setResults(data); })
+      .catch(() => {}); // silent fail if empty
+  }, []);
 
   return (
     <div className="dashboard-container">
@@ -31,7 +39,10 @@ function App() {
       {/* Charts — show only after successful upload */}
       {results && !results.error && (
         <>
-          <TrendChart data={results.monthly_trends} />
+          <TrendChart
+            monthlyData={results.monthly_trends}
+            periodData={results.period_breakdown}
+          />
           <DownloadBar onShowInsights={() => setShowInsights(true)} />
         </>
       )}

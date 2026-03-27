@@ -1033,5 +1033,40 @@
     "category": "Utilities & Telecom",
     "confidence": 90,
     "reasoning": "PhonePe is a mobile recharge and utility payment service"
+  },
+  "MASIH AUTOMOBILE POS": {
+    "category": "Fuel & Auto",
+    "confidence": 95,
+    "reasoning": "Automobile parts purchase indicated by POS transaction"
+  },
+  "HP CENTRE MOTTN POS": {
+    "category": "Fuel & Auto",
+    "confidence": 95,
+    "reasoning": "Petrol pump transaction indicated by POS and HP Centre"
+  },
+  "UKAR HEALTHCARE POS": {
+    "category": "Healthcare & Medical",
+    "confidence": 95,
+    "reasoning": "Medical supply purchase indicated by POS and UKAR HEALTHCARE"
+  },
+  "UKAR HEALTHCAR SALMAR SIZWAN": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary payment indicated by SALMAR and UKAR HEALTHCARE"
+  },
+  "DEEPAK MOTORS POS": {
+    "category": "Fuel & Auto",
+    "confidence": 95,
+    "reasoning": "Automobile parts purchase indicated by POS and DEEPAK MOTORS"
+  },
+  "UKAR HEALTHCAR SALAPR SIZWAN": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary payment indicated by SALAPR and UKAR HEALTHCARE"
+  },
+  "DFCBANK PAY UPI": {
+    "category": "Fund Transfer",
+    "confidence": 80,
+    "reasoning": "UPI payment transaction indicated by DFCBANK PAY"
   }
 }
