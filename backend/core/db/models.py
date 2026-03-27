@@ -3,8 +3,9 @@ from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
+
 class Transaction(Base):
-    __tablename__ = 'transactions'
+    __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False)
@@ -18,5 +19,7 @@ class Transaction(Base):
 
     __table_args__ = (
         # Unique constraint to prevent duplicate ingestion of the same bank statement lines
-        UniqueConstraint('date', 'narration', 'debit', 'credit', 'balance', name='_stmt_row_uc'),
+        UniqueConstraint(
+            "date", "narration", "debit", "credit", "balance", name="_stmt_row_uc"
+        ),
     )

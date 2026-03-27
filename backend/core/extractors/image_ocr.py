@@ -36,69 +36,80 @@ IMPORTANT RULES:
 - The Date column must exactly match the DD/MM/YY format visible in the sheet.
 """
 
+
 class ImageOCRExtractor:
     """
     Extracts transaction data from a sequential list of image files (JPG/PNG/HEIC)
     using the Google Gemini Vision API. Mimics the exact list[dict] output of HDFCPDFExtractor.
     """
-    
+
     def __init__(self, image_paths: list[str], api_key: str = None):
         self.image_paths = sorted(image_paths)
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         if not self.api_key:
-            raise ValueError("GEMINI_API_KEY must be configured for Gemini Vision extraction (Add to .env file).")
-        
+            raise ValueError(
+                "GEMINI_API_KEY must be configured for Gemini Vision extraction (Add to .env file)."
+            )
+
         self.client = genai.Client(api_key=self.api_key)
         self.model_name = "gemini-2.5-flash"
 
     def extract(self) -> list[dict]:
         all_rows = []
         for i, img_path in enumerate(self.image_paths, 1):
-            print(f"      [OCR] Processing page {i}/{len(self.image_paths)}: {os.path.basename(img_path)}...")
-            
+            print(
+                f"      [OCR] Processing page {i}/{len(self.image_paths)}: {os.path.basename(img_path)}..."
+            )
+
             try:
                 # Prepare image for Gemini. The PIL Image format is directly supported by the python SDK.
                 pil_image = self._prepare_image(img_path)
-                
+
                 response = self.client.models.generate_content(
                     model=self.model_name,
-                    contents=["Extract the transactions exactly as requested in JSON format.", pil_image],
+                    contents=[
+                        "Extract the transactions exactly as requested in JSON format.",
+                        pil_image,
+                    ],
                     config=types.GenerateContentConfig(
-                        system_instruction=VISION_SYSTEM_PROMPT,
-                        temperature=0.0
-                    )
+                        system_instruction=VISION_SYSTEM_PROMPT, temperature=0.0
+                    ),
                 )
-                
+
                 raw_text = response.text.strip()
-                
+
                 # Strip backticks if the model enclosed it in markdown
-                json_match = re.search(r'\[.*\]', raw_text, re.DOTALL)
-                
+                json_match = re.search(r"\[.*\]", raw_text, re.DOTALL)
+
                 if json_match:
                     page_rows = json.loads(json_match.group(0))
                     if isinstance(page_rows, list):
                         all_rows.extend(page_rows)
                     else:
-                        print(f"      [OCR] Warning: Expected list of dicts, got {type(page_rows)} on {img_path}")
+                        print(
+                            f"      [OCR] Warning: Expected list of dicts, got {type(page_rows)} on {img_path}"
+                        )
                 else:
-                    print(f"      [OCR] Warning: No JSON array detected on {img_path}. Model output: {raw_text[:100]}...")
-                    
+                    print(
+                        f"      [OCR] Warning: No JSON array detected on {img_path}. Model output: {raw_text[:100]}..."
+                    )
+
             except Exception as e:
                 print(f"      [OCR] Error extracting {img_path}: {e}")
-                
+
         return all_rows
 
     def _prepare_image(self, image_path: str) -> Image.Image:
         """
-        Reads an image (including HEIC), converts it to standard RGB, 
+        Reads an image (including HEIC), converts it to standard RGB,
         downscales it if it's too massive, and returns a PIL Image for Gemini.
         """
         MAX_DIMENSION = 2000
-        
+
         img = Image.open(image_path)
         if img.mode != "RGB":
             img = img.convert("RGB")
-        
+
         width, height = img.size
         if max(width, height) > MAX_DIMENSION:
             scale_factor = MAX_DIMENSION / max(width, height)

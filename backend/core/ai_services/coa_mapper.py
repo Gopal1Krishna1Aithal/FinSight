@@ -33,19 +33,20 @@ from groq import Groq
 # Configuration
 # ---------------------------------------------------------------------------
 
-CATEGORIES_FILE       = Path("mapping") / "categories.json"
-CACHE_FILE            = Path("mapping") / "cache.json"
-MODEL                 = "llama-3.1-8b-instant"
-BATCH_SIZE            = 20      # descriptions per API call
-RETRY_LIMIT           = 2       # retries per failed/incomplete batch
-RETRY_DELAY           = 3       # seconds between retries
-CONFIDENCE_THRESHOLD  = 70      # below this → Review_Required = True
-MAX_TOKENS            = 2048    # nested JSON is ~3x larger than flat — must be higher
+CATEGORIES_FILE = Path("mapping") / "categories.json"
+CACHE_FILE = Path("mapping") / "cache.json"
+MODEL = "llama-3.1-8b-instant"
+BATCH_SIZE = 20  # descriptions per API call
+RETRY_LIMIT = 2  # retries per failed/incomplete batch
+RETRY_DELAY = 3  # seconds between retries
+CONFIDENCE_THRESHOLD = 70  # below this → Review_Required = True
+MAX_TOKENS = 2048  # nested JSON is ~3x larger than flat — must be higher
 
 
 # ---------------------------------------------------------------------------
 # File I/O
 # ---------------------------------------------------------------------------
+
 
 def _load_categories() -> list[dict]:
     if not CATEGORIES_FILE.exists():
@@ -82,9 +83,9 @@ def _load_cache() -> dict:
         if isinstance(val, str):
             # Legacy flat entry — migrate silently
             migrated[key] = {
-                "category":   val,
+                "category": val,
                 "confidence": 100,
-                "reasoning":  "Migrated from legacy flat cache.",
+                "reasoning": "Migrated from legacy flat cache.",
             }
             needs_save = True
         else:
@@ -107,10 +108,10 @@ def _save_cache(cache: dict) -> None:
 # Prompt
 # ---------------------------------------------------------------------------
 
+
 def _build_category_block(categories: list[dict]) -> str:
     return "\n".join(
-        f"{i}. {c['name']} — {c['description']}"
-        for i, c in enumerate(categories, 1)
+        f"{i}. {c['name']} — {c['description']}" for i, c in enumerate(categories, 1)
     )
 
 
@@ -138,7 +139,7 @@ def _build_prompt(
       - 0-49:   very unclear, essentially guessing
     """
     valid_names_str = ", ".join(f'"{c["name"]}"' for c in categories)
-    desc_json       = json.dumps(descriptions, indent=2, ensure_ascii=False)
+    desc_json = json.dumps(descriptions, indent=2, ensure_ascii=False)
 
     return f"""You are a financial data classification engine for an Indian business bank account.
 
@@ -192,10 +193,10 @@ Return ONLY the JSON object:"""
 # Response validation helpers
 # ---------------------------------------------------------------------------
 
-_FALLBACK_ENTRY = lambda desc: {   # noqa: E731
-    "category":   "Uncategorized",
+_FALLBACK_ENTRY = lambda desc: {  # noqa: E731
+    "category": "Uncategorized",
     "confidence": 0,
-    "reasoning":  "Could not be classified after all retries.",
+    "reasoning": "Could not be classified after all retries.",
 }
 
 
@@ -207,14 +208,16 @@ def _validate_entry(key: str, entry, valid_names: set) -> dict:
     if not isinstance(entry, dict):
         return _FALLBACK_ENTRY(key)
 
-    category   = entry.get("category", "Uncategorized")
+    category = entry.get("category", "Uncategorized")
     confidence = entry.get("confidence", 0)
-    reasoning  = entry.get("reasoning", "")
+    reasoning = entry.get("reasoning", "")
 
     # Category must be a known name
     if category not in valid_names:
-        print(f"        [Groq] Unknown category '{category}' for '{key}' → Uncategorized")
-        category   = "Uncategorized"
+        print(
+            f"        [Groq] Unknown category '{category}' for '{key}' → Uncategorized"
+        )
+        category = "Uncategorized"
         confidence = 0
 
     # Confidence must be an integer 0-100
@@ -228,15 +231,16 @@ def _validate_entry(key: str, entry, valid_names: set) -> dict:
         reasoning = "No reasoning provided."
 
     return {
-        "category":   category,
+        "category": category,
         "confidence": confidence,
-        "reasoning":  reasoning.strip(),
+        "reasoning": reasoning.strip(),
     }
 
 
 # ---------------------------------------------------------------------------
 # Groq API call with retry
 # ---------------------------------------------------------------------------
+
 
 def _call_groq(
     client: Groq,
@@ -249,7 +253,7 @@ def _call_groq(
     Retries up to RETRY_LIMIT times on failure or incomplete response.
     """
     valid_names = {c["name"] for c in categories}
-    remaining   = list(descriptions)
+    remaining = list(descriptions)
     accumulated: dict = {}
 
     for attempt in range(1, RETRY_LIMIT + 2):
@@ -265,7 +269,9 @@ def _call_groq(
             )
 
             raw = response.choices[0].message.content.strip()
-            raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.MULTILINE).strip()
+            raw = re.sub(
+                r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.MULTILINE
+            ).strip()
 
             parsed: dict = json.loads(raw)
 
@@ -315,6 +321,7 @@ def _call_groq(
 # Public class
 # ---------------------------------------------------------------------------
 
+
 class CoAMapper:
     """
     Categorises transactions in a sanitized DataFrame using Groq LLM.
@@ -338,17 +345,17 @@ class CoAMapper:
                 "GROQ_API_KEY is not set. Add it to your .env file:\n"
                 "  GROQ_API_KEY=gsk_..."
             )
-        self.client         = Groq(api_key=api_key)
-        self.categories     = _load_categories()
+        self.client = Groq(api_key=api_key)
+        self.categories = _load_categories()
         self.category_block = _build_category_block(self.categories)
-        self.cache          = _load_cache()
+        self.cache = _load_cache()
 
     def map(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
 
         # ── 1. Split cached vs uncached ────────────────────────────────
-        all_unique   = df["Clean_Description"].unique().tolist()
-        uncached     = [d for d in all_unique if d not in self.cache]
+        all_unique = df["Clean_Description"].unique().tolist()
+        uncached = [d for d in all_unique if d not in self.cache]
         cached_count = len(all_unique) - len(uncached)
 
         print(f"      Unique descriptions  : {len(all_unique)}")
@@ -357,12 +364,17 @@ class CoAMapper:
 
         # ── 2. Batch → Groq → cache ────────────────────────────────────
         if uncached:
-            batches = [uncached[i : i + BATCH_SIZE] for i in range(0, len(uncached), BATCH_SIZE)]
+            batches = [
+                uncached[i : i + BATCH_SIZE]
+                for i in range(0, len(uncached), BATCH_SIZE)
+            ]
             print(f"      Batches              : {len(batches)} × ≤{BATCH_SIZE}")
 
             for idx, batch in enumerate(batches, 1):
                 print(f"      → Batch {idx}/{len(batches)}: {len(batch)} descriptions")
-                result = _call_groq(self.client, batch, self.category_block, self.categories)
+                result = _call_groq(
+                    self.client, batch, self.category_block, self.categories
+                )
                 self.cache.update(result)
                 _save_cache(self.cache)
                 print(f"        Saved. Cache now has {len(self.cache)} entries.")
@@ -374,18 +386,30 @@ class CoAMapper:
                 return entry.get(field, default)
             return default
 
-        df["CoA_Category"]     = df["Clean_Description"].apply(lambda d: _get_field(d, "category",   "Uncategorized"))
-        df["Confidence_Score"] = df["Clean_Description"].apply(lambda d: _get_field(d, "confidence", 0))
-        df["Reasoning"]        = df["Clean_Description"].apply(lambda d: _get_field(d, "reasoning",  "Not classified."))
+        df["CoA_Category"] = df["Clean_Description"].apply(
+            lambda d: _get_field(d, "category", "Uncategorized")
+        )
+        df["Confidence_Score"] = df["Clean_Description"].apply(
+            lambda d: _get_field(d, "confidence", 0)
+        )
+        df["Reasoning"] = df["Clean_Description"].apply(
+            lambda d: _get_field(d, "reasoning", "Not classified.")
+        )
 
         # ── 4. Report low-confidence and uncategorized rows ───────────
         needs_review = df[
-            (df["Confidence_Score"] < CONFIDENCE_THRESHOLD) |
-            (df["CoA_Category"] == "Uncategorized")
+            (df["Confidence_Score"] < CONFIDENCE_THRESHOLD)
+            | (df["CoA_Category"] == "Uncategorized")
         ]
         if len(needs_review):
             print(f"\n      ⚠  {len(needs_review)} rows will be flagged for review:")
-            for _, r in needs_review[["Clean_Description", "CoA_Category", "Confidence_Score"]].drop_duplicates().iterrows():
-                print(f"         [{r['Confidence_Score']:>3}%] {r['CoA_Category']:<25} ← {r['Clean_Description']}")
+            for _, r in (
+                needs_review[["Clean_Description", "CoA_Category", "Confidence_Score"]]
+                .drop_duplicates()
+                .iterrows()
+            ):
+                print(
+                    f"         [{r['Confidence_Score']:>3}%] {r['CoA_Category']:<25} ← {r['Clean_Description']}"
+                )
 
         return df

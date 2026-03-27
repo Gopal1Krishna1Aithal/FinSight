@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from core.db.session import SessionLocal
 from core.db.models import Transaction
 
+
 def upsert_transactions(df: pd.DataFrame) -> int:
     """
     Takes a clean Pandas DataFrame containing CoA_Category and inserts it
@@ -22,9 +23,9 @@ def upsert_transactions(df: pd.DataFrame) -> int:
                 debit=float(row.get("Debit", 0.0)),
                 credit=float(row.get("Credit", 0.0)),
                 balance=float(row.get("Balance", 0.0)),
-                coa_category=str(row.get("CoA_Category", "Uncategorized"))
+                coa_category=str(row.get("CoA_Category", "Uncategorized")),
             )
-            
+
             session.add(txn)
             try:
                 session.commit()

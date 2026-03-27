@@ -1,0 +1,135 @@
+STYLE GUIDE:
+Agentica 2.0 Hackathon Style Guide
+Our iconography
+Our icons are crisp, clean, minimal, and highly functional graphic elements meant to punctuate, inform, and highlight content.
+Our Colors
+Our colors
+Primary color palette
+Secondary color palette One of the first impressions that comes across with color. Our primary color is Purple, Graphite
+Gradient color palette Black and White. These colors are supplemented by secondary colors that allow us to emphasize
+Color and accessibility in digital elements as we need to drive hierarchy, yet still keep the brand look and feel balanced.
+Typography
+Primary color palette
+Use our primary color palette first and frequently throughout our visual system, especially for hero application areas -
+
+such as brochure covers, presentation covers, and website home pages. This approach will help us build equity in our
+
+color and make it an identifiable element of our brand.
+Purple Graphite Black White
+RGB 115, 83, 246 RGB 44, 44, 44 RGB 255, 255, 255
+HEX #7353F6 HEX #2C2C2C HEX #ffffff
+Secondary color palette
+To supplement our primary color palette, the secondary colors shown here are used to add warmth and visual contrast to our
+communications.
+Lavender Pale Purple Sky Blue Neutral Dark Gray (Text only)
+RGB 168, 139, 255 RGB 235, 228, 255 RGB 92, 201, 245 RGB 35, 31, 32
+HEX #A88BFF HEX #EBE4FF HEX #5CC9F5 HEX #231F20
+Light Gray
+RGB 235, 235, 235
+HEX #EBEBEB
+Gradient color palette
+Our gradient blends Purple with Deep Sky Blue.
+
+This gradient represents innovation, energy, and forward movement, aligning with our modern digital identity.
++ =
+Purple Deep Sky Blue
+RGB 115, 83, 246 RGB 192, 255, 100
+HEX #7353F6 HEX #00C0FF
+Color and accessibility in digital
+Our color palette was designed to meet the Americans with Disabilities Act (ADA) color contrast standards.
+
+
+When combining colors for on-screen text — such as for buttons, infographics, or tables — we must ensure all audiences can
+easily read our content.
+
+
+Refer to the Web Content Accessibility Guidelines (WCAG) 2.0 for accessibility details.
+Text color White Pale Purple Light Gray Lavender Purple
+White #ffffff All text sizes All text sizes
+Purple #7353F6 All text sizes All text sizes All text sizes All text sizes All text sizes
+Neutral Dark Gray #231F20 All text sizes All text sizes All text sizes
+Sky Blue #5CC9F5 All text sizes All text sizes
+Typography - Bebas Neue (For headings)
+Aa
+Aa Aa
+Regular Medium SemiBold
+Typography - Montserrat (Normal)
+Aa Aa Aa
+Regular Medium SemiBold
+
+INSTRUCTIONS:
+Frontend and Backend Run Instructions
+How to Clone the Project and Run Frontend & Backend Separately
+This document provides clear, step-by-step instructions to clone the project from GitHub and run the
+frontend and backend independently. Follow each section carefully.
+1. Prerequisites
+Ensure the following software is installed on your system:
+• Git – to clone the project repository
+• Node.js (v16 or above) – for frontend execution
+• npm – comes with Node.js
+• Python (v3.9 or above) – for backend execution
+• pip – Python package manager
+• Virtual Environment (venv) – recommended for backend isolation
+⚠️ Important: Always use two separate terminals — one for backend and one for frontend.
+• Ensure virtual environment is activated
+• Ensure requirements.txt dependencies are installed
+• Check Python version compatibility
+• Confirm backend server is running
+• Verify API base URL in frontend configuration
+Check Installed Versions
+node -v
+npm -v
+python --version
+pip --version
+2. Clone the Project from Git
+Open a terminal or command prompt and run:
+git clone <REPOSITORY_URL>
+Example:
+1git clone https://github.com/your-org/your-project.git
+Move into the project folder:
+cd your-project
+3. Project Structure (Example)
+project-root/
+│
+├── frontend/
+│ ├── package.json
+│ └── src/
+│
+├── backend/
+│ ├── manage.py
+│ ├── requirements.txt
+│ └── backend_project/
+│
+└── README.md
+4. Running the Backend (Django Example)
+Step 1: Navigate to Backend Folder
+cd backend
+Step 2: Create Virtual Environment (First Time Only)
+python -m venv venv
+Step 3: Activate Virtual Environment
+Windows:
+venv\Scripts\activate
+2Mac / Linux
+source venv/bin/activate
+Step 4: Install Backend Dependencies
+pip install -r requirements.tx
+python manage.py runserver
+Backend will be available at:
+http://127.0.0.1:8000/
+5. Running the Frontend (React / Vite / Static Example)
+Step 1: Open a New Terminal
+(Keep the backend terminal running)
+Step 2: Navigate to Frontend Folder
+cd frontend
+Step 3: Install Frontend Dependencies (First Time Only)
+npm install
+Step 4: Start Frontend Development Server
+npm run dev
+or
+npm start
+3Frontend will be available at (example):
+http://localhost:3000/
+or
+http://localhost:5173/
+This document can be shared with teammates to easily clone and run the project.
+4

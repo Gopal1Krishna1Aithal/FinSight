@@ -1,0 +1,19 @@
+{
+    "runway_and_burn_rate": {
+        "daily_burn_rate": 9095.47,
+        "monthly_burn_rate": 272864.17,
+        "average_monthly_inflow": 263539.95,
+        "current_balance": 1188320.0,
+        "runway_days_left": 130.6,
+        "health_status": "HEALTHY"
+    },
+    "crisis_survival_mode": {
+        "essential_monthly_overhead": 219409.16,
+        "crisis_runway_days_left": 162.5,
+        "total_tracked_essential_spend": 16016868.84
+    },
+    "cash_withdrawal_tracker": {
+        "total_cash_withdrawn": 236200.0,
+        "tds_194N_limit": 2000000.0,
+        "limit_remaining": 1763800.0,
+        "warning_active": 

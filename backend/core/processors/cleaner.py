@@ -4,17 +4,17 @@ import pandas as pd
 # Matches the statement date-range artifact that leaks into narrations on
 # page-boundary rows, e.g. " To:31/03/2019" or " From:01/04/2018"
 _DATE_RANGE_ARTIFACT = re.compile(
-    r'\s*(From\s*:\s*\d{2}/\d{2}/\d{4}|To\s*:\s*\d{2}/\d{2}/\d{4})',
+    r"\s*(From\s*:\s*\d{2}/\d{2}/\d{4}|To\s*:\s*\d{2}/\d{2}/\d{4})",
     flags=re.IGNORECASE,
 )
 
 # Matches the FEE row ref-number echo that appears twice in narration,
 # e.g. "FEE-ATMCASH...AOR123 AOR123 388"  →  deduplicate the ref echo
-_FEE_REF_ECHO = re.compile(r'(AOR\w+)\s+\1\s*\w*', flags=re.IGNORECASE)
+_FEE_REF_ECHO = re.compile(r"(AOR\w+)\s+\1\s*\w*", flags=re.IGNORECASE)
 
 # Matches split POS suffix artifacts like trailing " SDEBIT" or " EBIT"
 # that weren't fully merged (safety net — extractor handles most of these)
-_POS_SUFFIX = re.compile(r'\s+[SE]?DEBIT$', flags=re.IGNORECASE)
+_POS_SUFFIX = re.compile(r"\s+[SE]?DEBIT$", flags=re.IGNORECASE)
 
 
 class HDFCDataCleaner:
@@ -29,7 +29,15 @@ class HDFCDataCleaner:
                        not forwarded to downstream steps.
     """
 
-    HEADERS = ['Date', 'Narration', 'Ref_No', 'Value_Date', 'Debit', 'Credit', 'Balance']
+    HEADERS = [
+        "Date",
+        "Narration",
+        "Ref_No",
+        "Value_Date",
+        "Debit",
+        "Credit",
+        "Balance",
+    ]
 
     def __init__(self, raw_data: list[dict]):
         self.raw_data = raw_data
@@ -56,7 +64,7 @@ class HDFCDataCleaner:
         """
         rows = []
         for record in self.raw_data:
-            row = {col: record.get(col, '').strip() for col in self.HEADERS}
+            row = {col: record.get(col, "").strip() for col in self.HEADERS}
             rows.append(row)
         return pd.DataFrame(rows, columns=self.HEADERS)
 
@@ -70,14 +78,15 @@ class HDFCDataCleaner:
            (e.g. 'AOR1829583474AOR1829583474670 670').
         3. Collapse any leftover whitespace runs to a single space.
         """
+
         def _fix(text: str) -> str:
-            text = _DATE_RANGE_ARTIFACT.sub('', text)
-            text = _FEE_REF_ECHO.sub(r'\1', text)
-            text = _POS_SUFFIX.sub(' POS DEBIT', text)   # normalise suffix
-            return re.sub(r'\s+', ' ', text).strip()
+            text = _DATE_RANGE_ARTIFACT.sub("", text)
+            text = _FEE_REF_ECHO.sub(r"\1", text)
+            text = _POS_SUFFIX.sub(" POS DEBIT", text)  # normalise suffix
+            return re.sub(r"\s+", " ", text).strip()
 
         df = df.copy()
-        df['Narration'] = df['Narration'].apply(_fix)
+        df["Narration"] = df["Narration"].apply(_fix)
         return df
 
     def _coerce_numbers(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -90,14 +99,14 @@ class HDFCDataCleaner:
         - Negative balances        : '-1,662.58'     →  -1662.58
         """
         df = df.copy()
-        for col in ('Debit', 'Credit', 'Balance'):
+        for col in ("Debit", "Credit", "Balance"):
             df[col] = (
                 df[col]
                 .astype(str)
-                .str.replace(',', '', regex=False)   # remove thousand separators
+                .str.replace(",", "", regex=False)  # remove thousand separators
                 .str.strip()
             )
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
         return df
 
@@ -107,13 +116,13 @@ class HDFCDataCleaner:
         Value_Date is parsed the same way but kept only for the validator.
         """
         df = df.copy()
-        df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%y', errors='coerce')
+        df["Date"] = pd.to_datetime(df["Date"], format="%d/%m/%y", errors="coerce")
 
         # Some rows use 4-digit years — try those where the first pass failed
-        mask_failed = df['Date'].isna()
+        mask_failed = df["Date"].isna()
         if mask_failed.any():
-            df.loc[mask_failed, 'Date'] = pd.to_datetime(
-                df.loc[mask_failed, 'Date'], format='%d/%m/%Y', errors='coerce'
+            df.loc[mask_failed, "Date"] = pd.to_datetime(
+                df.loc[mask_failed, "Date"], format="%d/%m/%Y", errors="coerce"
             )
 
         return df

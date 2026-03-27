@@ -6,7 +6,7 @@ venv/
 .env
 
 # Data (Don't push your actual bank statements!)
-#data/input/
+data/input/
 data/output/
 mapping/cache.json
 

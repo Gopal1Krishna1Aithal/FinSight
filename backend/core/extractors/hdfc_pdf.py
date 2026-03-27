@@ -157,12 +157,6 @@
 #         return merged
 
 
-
-
-
-
-
-
 import re
 import pdfplumber
 
@@ -184,17 +178,17 @@ import pdfplumber
 #   Credit  x0 ≈ 516–534  → 470–535  ✓
 #   Balance x0 ≈ 594–608  → 535–640  ✓
 COL_BOUNDARIES = [
-    ('Date',       0,   70),
-    ('Narration',  70,  270),   # end: 285 → 270
-    ('Ref_No',     270, 358),   # start: 285 → 270
-    ('Value_Date', 358, 400),
-    ('Debit',      400, 470),   # end: 488 → 470
-    ('Credit',     470, 535),   # start: 488 → 470; end: 560 → 535
-    ('Balance',    535, 640),   # start: 560 → 535
+    ("Date", 0, 70),
+    ("Narration", 70, 270),  # end: 285 → 270
+    ("Ref_No", 270, 358),  # start: 285 → 270
+    ("Value_Date", 358, 400),
+    ("Debit", 400, 470),  # end: 488 → 470
+    ("Credit", 470, 535),  # start: 488 → 470; end: 560 → 535
+    ("Balance", 535, 640),  # start: 560 → 535
 ]
 
 # Matches DD/MM/YY or DD/MM/YYYY in the Date column only
-DATE_PATTERN = re.compile(r'^\d{2}/\d{2}/\d{2,4}$')
+DATE_PATTERN = re.compile(r"^\d{2}/\d{2}/\d{2,4}$")
 
 
 def _assign_col(x0: float) -> str | None:
@@ -220,35 +214,37 @@ def _find_table_bounds(words: list[dict], page_height: float) -> tuple[float, fl
 
     # Case 1: page has a header row — 'Date' in the Date column (x0 < 70)
     for w in words:
-        if w['text'] == 'Date' and w['x0'] < 70:
+        if w["text"] == "Date" and w["x0"] < 70:
             # +15 clears both single-line headers (original PDF) and two-line
             # headers like "Withdrawal / Amt. (Rs.)" in modern PDFs, while
             # still including the first transaction row in both cases.
-            table_start = w['top'] + 15
+            table_start = w["top"] + 15
             break
 
     # Case 2: no header (pages 2+) — use first transaction date
     if table_start is None:
         for w in words:
-            if DATE_PATTERN.match(w['text']) and w['x0'] < 70:
-                table_start = w['top'] - 2
+            if DATE_PATTERN.match(w["text"]) and w["x0"] < 70:
+                table_start = w["top"] - 2
                 break
 
     if table_start is None:
-        return (page_height, page_height)   # nothing to extract
+        return (page_height, page_height)  # nothing to extract
 
     # Footer boundary: 'Page No.' run-together text ('PageNo.:'), or
     # 'STATEMENT' (summary block), or 'HDFC BANK LIMITED' footer line —
     # whichever comes first after the table body.
     table_end = page_height
     for w in words:
-        if w['top'] <= table_start + 50:    # must be well below the table start
+        if w["top"] <= table_start + 50:  # must be well below the table start
             continue
-        text = w['text'].replace(' ', '')
-        if (text.startswith('PageNo')
-                or text.startswith('STATEMENT')
-                or text.startswith('*Closing')):   # footer line present in all layouts
-            table_end = min(table_end, w['top'])
+        text = w["text"].replace(" ", "")
+        if (
+            text.startswith("PageNo")
+            or text.startswith("STATEMENT")
+            or text.startswith("*Closing")
+        ):  # footer line present in all layouts
+            table_end = min(table_end, w["top"])
 
     return (table_start, table_end)
 
@@ -268,20 +264,20 @@ def _extract_page_rows(page) -> list[dict]:
     # A tolerance of 3pt handles slight vertical misalignment within one row.
     raw_rows: dict[int, dict] = {}
     for w in words:
-        if not (table_start <= w['top'] < table_end):
+        if not (table_start <= w["top"] < table_end):
             continue
-        col = _assign_col(w['x0'])
+        col = _assign_col(w["x0"])
         if col is None:
             continue
-        row_key = round(w['top'] / 3) * 3
+        row_key = round(w["top"] / 3) * 3
         if row_key not in raw_rows:
             raw_rows[row_key] = {}
         # Concatenate words that share the same cell (e.g. multi-word narrations).
         # Space separator ensures words are joined correctly in computer-generated
         # PDFs where each word is extracted individually (unlike scanned PDFs where
         # pdfplumber merges adjacent text into a single word token).
-        existing = raw_rows[row_key].get(col, '')
-        raw_rows[row_key][col] = (existing + ' ' + w['text']) if existing else w['text']
+        existing = raw_rows[row_key].get(col, "")
+        raw_rows[row_key][col] = (existing + " " + w["text"]) if existing else w["text"]
 
     return [cols for _, cols in sorted(raw_rows.items())]
 
@@ -328,20 +324,19 @@ class HDFCPDFExtractor:
         cols = [name for name, *_ in COL_BOUNDARIES]
 
         for row in rows:
-            has_date = DATE_PATTERN.match(row.get('Date', ''))
+            has_date = DATE_PATTERN.match(row.get("Date", ""))
             has_numbers = any(
-                row.get(c, '').strip()
-                for c in ('Debit', 'Credit', 'Balance')
+                row.get(c, "").strip() for c in ("Debit", "Credit", "Balance")
             )
 
             if has_date or has_numbers:
                 # Ensure every column key exists
                 for col in cols:
-                    row.setdefault(col, '')
+                    row.setdefault(col, "")
                 merged.append(row)
             else:
                 # Continuation — append narration text to previous row
-                if merged and row.get('Narration', '').strip():
-                    merged[-1]['Narration'] += ' ' + row['Narration'].strip()
+                if merged and row.get("Narration", "").strip():
+                    merged[-1]["Narration"] += " " + row["Narration"].strip()
 
         return merged
