@@ -44,6 +44,44 @@ MAX_TOKENS = 2048  # nested JSON is ~3x larger than flat — must be higher
 
 
 # ---------------------------------------------------------------------------
+# Tier-1 Deterministic Taxonomy (SaaS Efficiency Engine)
+# ---------------------------------------------------------------------------
+
+_DETERMINISTIC_TAXONOMY = {
+    r"ATM\s*WITHDRAWAL|NWD-|EAW-|ATW-": "ATM Withdrawal",
+    r"CASH\s*DEPOSIT|CD-": "Cash Deposit",
+    r"FUEL|HPCL|HP\s*CENTRE|HP\s*GAS|IOCL|PETROL|MOTORS|BPCL|SHELL": "Fuel & Auto",
+    r"AIRTEL|JIO|IDEA|BSNL|BROADBAND|VODAFONE|ACTFI": "Utilities & Telecom",
+    r"AMAZON|AMZN|FLIPKART|FKRT|MEESHO|RETAIL|JIOMART|BLINKIT|ZEPTO": "E-Commerce & Retail",
+    r"UBER|OLA\s*CABS|IRCTC|TRAVEL|INDIGO|AIR\s*INDIA|VISTARA|MAKEMYTRIP|MMT": "Travel & Transport",
+    r"SALARY|PAYROLL|PAY\s*ROLL|SAL-": "Payroll",
+    r"RECHARGE|MOB\s*REC": "Utilities & Telecom",
+    r"ZOMATO|SWIGGY|FOOD|RESTAURANT|CAFE|EATERY": "E-Commerce & Retail",
+    r"HEALTHCARE|PHARMACY|MEDIC|HOSPITAL|1MG|APOLLO": "Healthcare & Medical",
+    r"CHG|FEES|SERVICE\s*CHG|FINE|GST-|TAX|INT-": "Bank Charges & Fees",
+    r"CC\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\s*CARD": "Credit Card Repayment",
+    r"INTEREST|INT-": "Interest & Dividends",
+    r"IMPS-|NEFT-|RTGS-|TRANSFER": "IMPS Transfer",
+}
+
+def _match_taxonomy(description: str) -> dict | None:
+    """
+    Check if the description matches a known high-precision pattern.
+    Returns a Mapping Entry dict if found, else None.
+    """
+    import re
+    desc_upper = description.upper()
+    for pattern, cat in _DETERMINISTIC_TAXONOMY.items():
+        if re.search(pattern, desc_upper):
+            return {
+                "category": cat,
+                "confidence": 100,
+                "reasoning": f"Deterministic match: Pattern '{pattern}' matched."
+            }
+    return None
+
+
+# ---------------------------------------------------------------------------
 # File I/O
 # ---------------------------------------------------------------------------
 
@@ -353,8 +391,16 @@ class CoAMapper:
     def map(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
 
-        # ── 1. Split cached vs uncached ────────────────────────────────
+        # ── Startup-Tier Hybrid Optimization: Deterministic First ───────
         all_unique = df["Clean_Description"].unique().tolist()
+        for desc in all_unique:
+            if desc not in self.cache:
+                tax_match = _match_taxonomy(desc)
+                if tax_match:
+                    self.cache[desc] = tax_match
+        _save_cache(self.cache)
+
+        # ── 1. Split cached vs uncached (LLM is only for unknown narrations)
         uncached = [d for d in all_unique if d not in self.cache]
         cached_count = len(all_unique) - len(uncached)
 

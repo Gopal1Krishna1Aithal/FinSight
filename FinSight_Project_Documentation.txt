@@ -1,0 +1,88 @@
+==========================================================================
+FINSIGHT: MULTI-PERIOD FINANCIAL INTELLIGENCE PIPELINE
+==========================================================================
+
+1. PROBLEM UNDERSTANDING
+------------------------
+Small and Medium Businesses (SMBs) often struggle to maintain a clear, real-time 
+view of their financial health. While bank statements contain the raw truth, 
+they present several obstacles:
+- Fragmented Data: Statements are usually issued in monthly or quarterly chunks.
+- Format Barriers: Data is locked in non-standard PDFs or physical images.
+- Extraction Noise: Narrations are cryptic (e.g., "IMPS/9823..."), making it hard 
+  to track where money is actually going.
+- No Strategic Layer: Traditional portals show what happened, but not what it 
+  MEANS for the business's runway or survival.
+
+FinSight was built to bridge this gap by transforming raw, messy bank transactions 
+into a structured, multi-period intelligence engine.
+
+
+2. SOLUTION WORKFLOW
+--------------------
+The FinSight pipeline follows a strict 6-stage sequence:
+1. Batch Ingestion: Supports simultaneous upload of multiple PDF/Image statements.
+2. Intelligent Extraction: Uses adaptive PDF parsing (for HDFC layouts) and 
+   Gemini-powered OCR for images/scans.
+3. Sanitization: Normalizes dates, cleans currency formatting, and scrubs 
+   sensitive PII from internal processing strings.
+4. AI Categorization: Transactions are routed through Groq (Llama 3.1), which 
+   maps narrations to a standard "Chart of Accounts" with high precision.
+5. Persistent Storage: Data is upserted into a central SQLite database, 
+   ensuring that new uploads append to the business's historic timeline.
+6. Reactive Visualization: The dashboard dynamically updates to show trends, 
+   category distributions, and AI-driven advisory reports.
+
+
+3. HIGH-LEVEL ARCHITECTURE
+--------------------------
+Frontend:
+- React.js: Single Page Application with a multi-tab modular interface.
+- Recharts: High-performance charting library for trends and composition.
+- Lucide-React: Premium iconography for a modern professional look.
+
+Backend:
+- Django (Python): Robust API framework managing file flows and endpoints.
+- Pandas/NumPy: Heavy-duty data processing and metric computation.
+- Groq AI: Ultra-low latency LLM inference for categorization and insights.
+- Gemini Pro: Vision-capable AI for high-accuracy OCR of scanned documents.
+
+Storage & Export:
+- SQLite/SQLAlchemy: Relational storage for transaction provenance.
+- Export Modules: Native support for Excel (Multi-sheet) and Tally-compatible 
+  XML/CSV formats.
+
+
+4. KEY FEATURES
+---------------
+- Multi-Period Dashboard: Unified view of Inflow vs Outflow over any duration.
+- Financial Health Stats: Real-time calculation of Burn Rate, Runway (Days), 
+  and Gross Estimated Profit. 
+- Crisis Survival Mode: A unique view that isolates "essential-only" spending 
+  to show the business owner their absolute minimum survival runway.
+- AI Chatbot: "Talk to your statements" — ask natural language questions like 
+  "How much did I spend on Software subscription in total?"
+- Expense Composition: Interactive Pie/Donut charts showing where the largest 
+  capital leakages occur.
+
+
+5. CHALLENGES & SOLUTIONS
+-------------------------
+- Challenge: PDF Layout Shifts. Banks often make subtle changes to column widths.
+  Solution: Implemented an adaptive boundary system that scans for header X-coordinates
+  to ensure 100% extraction accuracy across different statement generations.
+
+- Challenge: Context Loss in LLMs. Summarizing 1000+ transactions can exceed token limits.
+  Solution: Implemented a stratified sampling and summary-first context strategy, 
+  where the AI receives aggregated metrics rather than raw logs, keeping insights 
+  fast and cost-effective.
+
+- Challenge: Concurrent DB Locks. Background processing of large PDFs can lock 
+  the SQLite database.
+  Solution: Implemented increased SQLite timeout (30s) and working-replica 
+  DataFrame strategies to isolate processing from the UI.
+
+
+==========================================================================
+DOCUMENT END
+==========================================================================

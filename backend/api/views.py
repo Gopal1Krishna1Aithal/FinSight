@@ -8,16 +8,31 @@ from xml.dom import minidom
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from dotenv import load_dotenv
+
+# Load environment variables on startup
+load_dotenv()
 
 
 class _SafeEncoder(json.JSONEncoder):
-    """Converts numpy scalar types that are not natively JSON-serializable."""
     def default(self, obj):
         import numpy as np
         if isinstance(obj, np.bool_):   return bool(obj)
         if isinstance(obj, np.integer): return int(obj)
         if isinstance(obj, np.floating): return float(obj)
         return super().default(obj)
+
+def _sanitize_data(obj):
+    import math
+    import numpy as np
+    if isinstance(obj, dict):
+        return {k: _sanitize_data(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_sanitize_data(v) for v in obj]
+    elif isinstance(obj, (float, np.floating)):
+        if not math.isfinite(obj):
+            return None
+    return obj
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +88,38 @@ def _save_tally_xml(df, path: str) -> None:
 # ---------------------------------------------------------------------------
 # Metrics computation (from uploaded file's dataframe only)
 # ---------------------------------------------------------------------------
+
+def _validate_ledger_math(df):
+    """
+    Startup-Grade Integrity Layer:
+    Performs deterministic row-by-row balance verification.
+    If (Previous Balance - Debit + Credit) != Current Balance, flag the row.
+    This prevents 'silent hallucinations' from Gemini/OCR.
+    """
+    import pandas as pd
+    df = df.sort_values(["Period", "Date"]).reset_index(drop=True)
+    df["Math_Audit_Status"] = "VERIFIED"
+    df["Math_Error_Flag"] = False
+
+    for i in range(1, len(df)):
+        # We only check math if the previous row belongs to the same bank statement period
+        if df.loc[i, "Period"] == df.loc[i-1, "Period"]:
+            prev_bal = float(df.loc[i-1, "Balance"])
+            curr_dr  = float(df.loc[i, "Debit"])
+            curr_cr  = float(df.loc[i, "Credit"])
+            curr_bal = float(df.loc[i, "Balance"])
+            
+            # Allow for tiny rounding differences (floating point math)
+            expected_bal = round(prev_bal - curr_dr + curr_cr, 2)
+            actual_bal   = round(curr_bal, 2)
+            
+            if abs(expected_bal - actual_bal) > 0.02:
+                df.at[i, "Math_Audit_Status"] = "ERROR_DETECTION_ACTIVE"
+                df.at[i, "Math_Error_Flag"] = True
+                print(f"      [Integrity Check] 🚩 Math Mismatch at row {i}: Expected {expected_bal}, Found {actual_bal}")
+    
+    return df
+
 
 def _compute_metrics(df) -> dict:
     import pandas as pd
@@ -171,10 +218,20 @@ def _compute_metrics(df) -> dict:
     ]
     fixed_monthly = sum(s["recurring_amount"] for s in detected_subs)
 
-    # ── Category breakdown ───────────────────────────────────────────────────
-    cat_counts = [
-        {"category": str(cat), "count": int(cnt)}
-        for cat, cnt in df["CoA_Category"].value_counts().items()
+    # ── Category breakdown (Expenses only) ──────────────────────────────────
+    expenses_only = df[df["Debit"] > 0]
+    cat_expenses = (
+        expenses_only.groupby("CoA_Category")["Debit"]
+        .agg(["sum", "count"]).reset_index()
+        .sort_values("sum", ascending=False)
+    )
+    category_breakdown = [
+        {
+            "category": str(row["CoA_Category"]),
+            "value":    round(float(row["sum"]), 2),
+            "count":    int(row["count"]),
+        }
+        for _, row in cat_expenses.iterrows()
     ]
 
     return {
@@ -225,7 +282,20 @@ def _compute_metrics(df) -> dict:
             "detected_subscriptions":               detected_subs,
         },
         "monthly_trends":    monthly_trends,
-        "category_breakdown": cat_counts,
+        "category_breakdown": category_breakdown,
+        "transactions": [
+            {
+                "Date": row["Date"].strftime("%Y-%m-%d") if hasattr(row["Date"], "strftime") else str(row["Date"]),
+                "Clean_Description": str(row["Clean_Description"]),
+                "CoA_Category": str(row["CoA_Category"]),
+                "Debit": float(row["Debit"]),
+                "Credit": float(row["Credit"]),
+                "Balance": float(row["Balance"]),
+                "Math_Error": bool(row.get("Math_Error_Flag", False)),
+                "Audit_Status": str(row.get("Math_Audit_Status", "UNAUDITED"))
+            }
+            for _, row in df.sort_values(["Date"], ascending=False).iterrows()
+        ],
     }
 
 
@@ -309,7 +379,10 @@ def _run_pipeline(file_paths: list[str]) -> dict:
 
     # Consolidated DF for the response
     combined_df = pd.concat(all_dfs, ignore_index=True)
-    combined_df = combined_df.sort_values("Date").reset_index(drop=True)
+    combined_df = combined_df.sort_values(["Period", "Date"]).reset_index(drop=True)
+
+    # ── Startup Optimization: Deterministic Integrity Audit ───────────
+    combined_df = _validate_ledger_math(combined_df)
 
     # Save tally exports (cumulative for this session)
     try:
@@ -317,9 +390,9 @@ def _run_pipeline(file_paths: list[str]) -> dict:
         _save_tally_xml(combined_df, TALLY_XML)
     except Exception as e: print(f"[Tally Export] Warning: {e}")
 
-    # Generate insights
-    try: InsightsGenerator().generate_insights(INSIGHTS_PATH)
-    except Exception: pass
+    # Generate insights (on the current upload only)
+    try: InsightsGenerator().generate_insights(INSIGHTS_PATH, df=combined_df)
+    except Exception as e: print(f"[Insights] Error: {e}")
 
     # Compute metrics + period breakdown
     payload = _compute_metrics(combined_df)
@@ -337,7 +410,9 @@ def _run_pipeline(file_paths: list[str]) -> dict:
         })
     payload["period_breakdown"] = periods
 
-    return json.loads(json.dumps(payload, cls=_SafeEncoder))
+    # Sanitize and encode for JSON safety
+    sanitized = _sanitize_data(payload)
+    return json.loads(json.dumps(sanitized, cls=_SafeEncoder))
 
 
 # ---------------------------------------------------------------------------
@@ -382,6 +457,27 @@ def upload_statement(request):
     finally:
         for p in saved_paths:
             if os.path.exists(p): os.remove(p)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def chat_query(request):
+    """POST /api/chat/ — accepts { "message": "..." } and returns an AI answer."""
+    import json
+    try:
+        data = json.loads(request.body)
+        user_msg = data.get("message", "").strip()
+        if not user_msg:
+            return JsonResponse({"error": "No message provided."}, status=400)
+        
+        from core.ai_services.chat_service import ChatService
+        ai_resp = ChatService().ask(user_msg)
+        return JsonResponse({"response": ai_resp}, status=200)
+        
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 @require_http_methods(["GET"])

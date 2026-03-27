@@ -1,34 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
 :root {
-  /* ============================
-     PRIMARY COLOR PALETTE
-     ============================ */
-  --color-primary-purple: #7353F6;
-  --color-graphite-black: #2C2C2C;
+  /* ==========================================================================
+     AGENTICA 2.0 - PRIMARY COLOR PALETTE
+     ========================================================================== */
   --color-white: #ffffff;
+  --color-graphite-black: #2C2C2C;
+  --color-primary-purple: #7353F6;
 
-  /* ============================
-     SECONDARY COLOR PALETTE
-     ============================ */
-  --color-lavender: #A88BFF;
-  --color-pale-purple: #EBE4FF;
+  /* ==========================================================================
+     AGENTICA 2.0 - SECONDARY COLOR PALETTE
+     ========================================================================== */
   --color-sky-blue: #5CC9F5;
-  --color-neutral-dark-gray: #231F20;
-  --color-light-gray: #EBEBEB;
+  --color-pale-purple: #EBE4FF;
+  --color-lavender: #A88BFF;
+  --color-light-gray: #EBEBEE;
+  --color-neutral-dark-gray: #231F20; /* Text only */
 
-  /* ============================
-     GRADIENTS
-     ============================ */
+  /* ==========================================================================
+     GRADIENTS (Innovation Token)
+     ========================================================================== */
   --gradient-innovation: linear-gradient(135deg, #7353F6 0%, #00C0FF 100%);
+  --color-deep-sky-blue: #00C0FF;
 
-  /* ============================
+  /* ==========================================================================
+     GLASSMORPISM 2.0 - PREMIUM TOKENS (Within Guide Scope)
+     ========================================================================== */
+  --glass-border: 1px solid rgba(255, 255, 255, 0.45);
+  --glass-border-dark: 1px solid rgba(115, 83, 246, 0.15);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-blur: blur(20px);
+  --satin-glow: inset 0 0 12px rgba(255, 255, 255, 0.3);
+
+  /* ==========================================================================
      TYPOGRAPHY
-     ============================ */
-  --font-heading: 'Bebas Neue', sans-serif;
-  --font-body: 'Montserrat', sans-serif;
+     ========================================================================== */
+  --font-heading: 'Bebas Neue', cursiv;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   
-  /* ADA Accessibility compliant contrasts */
-  --text-on-purple: var(--color-white);
-  --text-on-light: var(--color-neutral-dark-gray);
+  /* ADA CONTRAST TOKENS */
+  --text-on-purple: #ffffff;
+  --text-on-sky: #231F20;
 }
 
 * {
@@ -39,10 +51,20 @@
 
 body {
   font-family: var(--font-body);
-  background-color: var(--color-light-gray);
   color: var(--color-neutral-dark-gray);
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  
+  /* Premium Mesh Background */
+  background-color: #fdfcff;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(115, 83, 246, 0.08) 0, transparent 50%), 
+    radial-gradient(at 100% 0%, rgba(92, 201, 245, 0.08) 0, transparent 50%), 
+    radial-gradient(at 100% 100%, rgba(115, 83, 246, 0.05) 0, transparent 50%), 
+    radial-gradient(at 0% 100%, rgba(92, 201, 245, 0.05) 0, transparent 50%),
+    /* Subtle Dot Pattern */
+    radial-gradient(circle, rgba(115, 83, 246, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 40px 40px;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -51,9 +73,30 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--color-graphite-black);
 }
 
-.innovation-text {
-  background: var(--gradient-innovation);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Staggered Children Logic ──────────────────────────── */
+.bento-grid > div:nth-child(1) { animation-delay: 0.05s; }
+.bento-grid > div:nth-child(2) { animation-delay: 0.10s; }
+.bento-grid > div:nth-child(3) { animation-delay: 0.15s; }
+.bento-grid > div:nth-child(4) { animation-delay: 0.20s; }
+.bento-grid > div:nth-child(5) { animation-delay: 0.25s; }
+.bento-grid > div:nth-child(6) { animation-delay: 0.30s; }
+
+.bento-item {
+  opacity: 0;
+  animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

@@ -48,10 +48,10 @@ const UploadSection = ({ onResults, onLoading }) => {
       try {
         data = JSON.parse(text);
       } catch {
-        // Django returned an HTML error page — extract a useful message
+        // Handle invalid JSON (often caused by NaN/Inf in the backend response)
         throw new Error(
           res.ok
-            ? 'Server returned an unexpected response. Check the backend terminal for details.'
+            ? 'The server returned an invalid data format (likely a mathematical error in the backend). Please check the backend logs.'
             : `Backend error ${res.status}: The server returned an HTML page instead of JSON. Check the backend terminal.`
         );
       }
@@ -69,74 +69,93 @@ const UploadSection = ({ onResults, onLoading }) => {
     }
   };
 
-  return (
-    <div className="upload-card">
-      <h2>Upload Statement</h2>
+  const onInputClick = () => {
+    document.getElementById('file-upload')?.click();
+  };
 
-      <form onDragEnter={handleDrag} onSubmit={(e) => e.preventDefault()} style={{ position: 'relative' }}>
-        <label
-          htmlFor="file-upload"
-          className={`drop-zone ${dragActive ? 'drag-active' : ''}`}
-          onDragEnter={handleDrag}
-          onDragOver={handleDrag}
-          onDragLeave={handleDrag}
-          onDrop={handleDrop}
-        >
-          {files.length === 0 ? (
-            <>
-              <UploadCloud size={64} />
-              <p>Drag &amp; drop your PDF or Images here</p>
-              <span>or click to browse — .pdf, .jpg, .jpeg, .png, .heic</span>
-            </>
-          ) : (
-            <div style={{ width: '100%' }}>
-              {files.map((f, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--color-light-gray)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FileText size={20} color="var(--color-primary-purple)" />
-                    <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{f.name}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); removeFile(i); }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}
-                  >
-                    <X size={18} />
-                  </button>
+  return (
+    <div className="glass-card">
+      <div className="glass-card-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <UploadCloud size={20} color="var(--color-primary-purple)" />
+          <h3>Secure Data Ingestion</h3>
+        </div>
+        <span style={{ fontSize: '0.75rem', color: '#888', fontWeight: 600 }}>BANK-GRADE OCR</span>
+      </div>
+
+      <div style={{ padding: '1.75rem' }}>
+        <form onDragEnter={handleDrag} onSubmit={(e) => e.preventDefault()} style={{ position: 'relative' }}>
+          <label
+            htmlFor="file-upload"
+            className={`upload-console ${dragActive ? 'drag-active' : ''}`}
+            onDragEnter={handleDrag}
+            onDragOver={handleDrag}
+            onDragLeave={handleDrag}
+            onDrop={handleDrop}
+          >
+            {files.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1rem 0' }}>
+                <div style={{ padding: '1.25rem', background: 'var(--color-pale-purple)', borderRadius: '50%', color: 'var(--color-primary-purple)' }}>
+                  <UploadCloud size={48} />
                 </div>
-              ))}
-              <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#888', textAlign: 'center' }}>
-                Click to add more files
-              </p>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontFamily: 'var(--font-heading)', fontSize: '1.6rem', color: 'var(--color-graphite-black)', letterSpacing: '1px' }}>DROP FINANCIAL STATEMENTS</p>
+                  <p style={{ fontSize: '0.85rem', color: '#888', marginTop: '4px' }}>Click or drag PDF, JPG, or PNG files to begin</p>
+                </div>
+              </div>
+            ) : (
+              <div style={{ width: '100%', textAlign: 'left' }}>
+                <p style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#888', marginBottom: '1rem', fontWeight: 700 }}>Documents Staged For Analysis</p>
+                {files.map((f, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 1rem', background: '#fff', borderRadius: '10px', marginBottom: '0.5rem', border: '1px solid var(--color-light-gray)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <FileText size={18} color="var(--color-primary-purple)" />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-neutral-dark-gray)' }}>{f.name}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); removeFile(i); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4d4d', display: 'flex' }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+                <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.8rem', color: 'var(--color-primary-purple)', fontWeight: 700, cursor: 'pointer' }} onClick={onInputClick}>
+                  + ADD MORE DOCUMENTS
+                </div>
+              </div>
+            )}
+          </label>
+
+          <input
+            id="file-upload"
+            type="file"
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png,.heic"
+            onChange={handleChange}
+            style={{ display: 'none' }}
+          />
+
+          {error && (
+            <div style={{ color: '#C00000', marginTop: '1.5rem', fontSize: '0.85rem', background: '#fff0f0', padding: '1rem', borderRadius: '8px', border: '1px solid #ffcccc' }}>
+               {error}
             </div>
           )}
-        </label>
 
-        <input
-          id="file-upload"
-          type="file"
-          multiple
-          accept=".pdf,.jpg,.jpeg,.png,.heic"
-          onChange={handleChange}
-          style={{ display: 'none' }}
-        />
-
-        {error && (
-          <p style={{ color: '#C00000', marginTop: '1rem', fontSize: '0.9rem', textAlign: 'center' }}>
-            ⚠ {error}
-          </p>
-        )}
-
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={files.length === 0}
-          onClick={handleSubmit}
-          id="extract-btn"
-        >
-          {files.length ? 'Extract Insights' : 'Select a File First'}
-        </button>
-      </form>
+          <div style={{ marginTop: '2rem' }}>
+            <button
+              type="button"
+              className="btn-innovation"
+              onClick={files.length > 0 ? handleSubmit : onInputClick}
+              id="extract-btn"
+              style={{ width: '100%' }}
+            >
+              {files.length ? 'LAUNCH INTELLIGENCE PIPELINE' : 'DRIVE DATA INGESTION'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

@@ -116,13 +116,14 @@ class HDFCDataCleaner:
         Value_Date is parsed the same way but kept only for the validator.
         """
         df = df.copy()
-        df["Date"] = pd.to_datetime(df["Date"], format="%d/%m/%y", errors="coerce")
+        raw_dates = df["Date"].astype(str)
+        df["Date"] = pd.to_datetime(raw_dates, format="%d/%m/%y", errors="coerce")
 
         # Some rows use 4-digit years — try those where the first pass failed
         mask_failed = df["Date"].isna()
         if mask_failed.any():
             df.loc[mask_failed, "Date"] = pd.to_datetime(
-                df.loc[mask_failed, "Date"], format="%d/%m/%Y", errors="coerce"
+                raw_dates[mask_failed], format="%d/%m/%Y", errors="coerce"
             )
 
         return df

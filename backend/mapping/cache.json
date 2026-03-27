@@ -1068,5 +1068,45 @@
     "category": "Fund Transfer",
     "confidence": 80,
     "reasoning": "UPI payment transaction indicated by DFCBANK PAY"
+  },
+  "MASIH AUT UKAR HEALTHCAR SALMAY SIZWAN": {
+    "category": "Healthcare & Medical",
+    "confidence": 90,
+    "reasoning": "Strong match with 'UKAR HEALTHCARE' and 'SALMAY' indicating medical supplier"
+  },
+  "S1ANDH24 DELHI": {
+    "category": "Travel & Transport",
+    "confidence": 90,
+    "reasoning": "IRCTC ticket purchase indicated by 'S1ANDH24' and 'DELHI'"
+  },
+  "UKAR HEALTHCAR SALAUG SIZWAN": {
+    "category": "Healthcare & Medical",
+    "confidence": 90,
+    "reasoning": "Business name 'UKAR HEALTHCAR' matches category criteria"
+  },
+  "UBER INDIA SYSTEMS": {
+    "category": "Travel & Transport",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'UBER|OLA\\s*CABS|IRCTC|TRAVEL|INDIGO|AIR\\s*INDIA|VISTARA|MAKEMYTRIP|MMT' matched."
+  },
+  "ZOMATO ORDER 123": {
+    "category": "E-Commerce & Retail",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'ZOMATO|SWIGGY|FOOD|RESTAURANT|CAFE|EATERY' matched."
+  },
+  "AMAZON PAY": {
+    "category": "E-Commerce & Retail",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'AMAZON|AMZN|FLIPKART|FKRT|MEESHO|RETAIL|JIOMART|BLINKIT|ZEPTO' matched."
+  },
+  "RECHARGE MOB 999": {
+    "category": "Utilities & Telecom",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'RECHARGE|MOB\\s*REC' matched."
+  },
+  "HDFC BANK CHG": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
   }
 }

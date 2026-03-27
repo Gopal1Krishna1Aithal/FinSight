@@ -21,25 +21,32 @@ class InsightsGenerator:
             )
         self.client = Groq(api_key=self.api_key)
 
-    def generate_insights(self, output_path: str) -> bool:
+    def generate_insights(
+        self, output_path: str, df: Optional[pd.DataFrame] = None
+    ) -> bool:
         """
-        Reads all historic transactions, aggregates them, and asks the LLM
+        Reads transactions, aggregates them, and asks the LLM
         for business insights. Saves the result to a markdown file.
         Returns True on success.
         """
-        # Load all data directly into a dataframe
-        query = "SELECT * FROM transactions"
-        try:
-            df = pd.read_sql_query(query, engine)
-        except Exception as e:
-            print(f"      [Insights] Error reading from DB: {e}")
-            return False
+        if df is None:
+            # Fallback to historic data if no specific dataframe passed
+            query = "SELECT * FROM transactions"
+            try:
+                df = pd.read_sql_query(query, engine)
+            except Exception as e:
+                print(f"      [Insights] Error reading from DB: {e}")
+                return False
 
         if df.empty:
-            print("      [Insights] Database is empty, skipping insights.")
+            print("      [Insights] Dataframe is empty, skipping insights.")
             return False
 
-        print(f"      [Insights] Analyzing {len(df)} historical transactions...")
+        print(f"      [Insights] Analyzing {len(df)} transactions for the report...")
+
+        # Ensure we work on a copy so we don't modify the original dataframe's columns
+        df = df.copy()
+        df.columns = [c.lower() for c in df.columns]
 
         # Ensure date type
         df["date"] = pd.to_datetime(df["date"])
