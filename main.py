@@ -23,7 +23,7 @@ import argparse
 load_dotenv()
 
 parser = argparse.ArgumentParser(description="Process a business bank statement PDF.")
-parser.add_argument("pdf", nargs="?", default=os.path.join("data", "input", "sample_business_statement-1-3.pdf"), help="Path to the PDF statement")
+parser.add_argument("pdf", nargs="?", default=os.path.join("data", "input", "pdfs"), help="Path to the PDF statement or folder of statements")
 args = parser.parse_args()
 
 PDF_PATH   = args.pdf
@@ -284,6 +284,7 @@ def _save_tally_csv(df: pd.DataFrame, path: str) -> None:
 # ---------------------------------------------------------------------------
 
 def run_pipeline() -> None:
+    global PDF_PATH
     os.makedirs(OUT_DIR, exist_ok=True)
 
     print("\n[0/6] Initializing database...")
@@ -295,25 +296,49 @@ def run_pipeline() -> None:
         print(f"      [!] Path not found at '{PDF_PATH}'. Aborting.")
         sys.exit(1)
 
-    raw_data = None
+    raw_data = []
     if os.path.isdir(PDF_PATH):
-        # Image OCR Mode
-        valid_extensions = {".jpg", ".jpeg", ".png", ".heic"}
+        # If the default pdfs folder is explicitly empty, check the images folder as a convenience fallback
+        if PDF_PATH == os.path.join("data", "input", "pdfs") and not os.listdir(PDF_PATH):
+             fallback_path = os.path.join("data", "input", "images")
+             if os.path.exists(fallback_path) and any(f.lower().endswith(('.jpg', '.jpeg', '.png', '.heic')) for f in os.listdir(fallback_path)):
+                 print(f"      [!] '{PDF_PATH}' is empty. Falling back to '{fallback_path}'.")
+                 PDF_PATH = fallback_path
+
+        # Folder Mode (Image or PDF)
+        valid_img_exts = {".jpg", ".jpeg", ".png", ".heic"}
         image_files = [
             os.path.join(PDF_PATH, f) for f in os.listdir(PDF_PATH)
-            if os.path.splitext(f.lower())[1] in valid_extensions
+            if os.path.splitext(f.lower())[1] in valid_img_exts
         ]
-        if not image_files:
-            print(f"      [!] No valid image files ({','.join(valid_extensions)}) found in '{PDF_PATH}'. Aborting.")
+        pdf_files = [
+            os.path.join(PDF_PATH, f) for f in os.listdir(PDF_PATH)
+            if f.lower().endswith('.pdf')
+        ]
+        
+        if image_files:
+            print(f"      [OCR] Found {len(image_files)} image files in {PDF_PATH}.")
+            from core.extractors.image_ocr import ImageOCRExtractor
+            extractor = ImageOCRExtractor(image_paths=image_files)
+            raw_data = extractor.extract() or []
+        elif pdf_files:
+            print(f"      [PDF] Found {len(pdf_files)} PDF files in {PDF_PATH}. Processing sequentially...")
+            for pf in sorted(pdf_files):
+                print(f"            → Extracting {os.path.basename(pf)}...")
+                ext_data = HDFCPDFExtractor(pf).extract()
+                if ext_data:
+                    raw_data.extend(ext_data)
+        else:
+            print(f"      [!] No valid image or PDF files found in '{PDF_PATH}'. Aborting.")
             sys.exit(1)
-            
-        print(f"      [OCR] Found {len(image_files)} image files in {PDF_PATH}.")
-        from core.extractors.image_ocr import ImageOCRExtractor
-        extractor = ImageOCRExtractor(image_paths=image_files)
-        raw_data = extractor.extract()
     else:
-        # Standard PDF Extractor
-        raw_data = HDFCPDFExtractor(PDF_PATH).extract()
+        # Standard Single File Extractor
+        if PDF_PATH.lower().endswith('.pdf'):
+            print(f"      [PDF] Extracting single file {os.path.basename(PDF_PATH)}...")
+            raw_data = HDFCPDFExtractor(PDF_PATH).extract() or []
+        else:
+            print(f"      [!] File {PDF_PATH} is not a PDF. Aborting.")
+            sys.exit(1)
 
     if not raw_data:
         print("      [!] Extraction returned no data. Aborting.")
