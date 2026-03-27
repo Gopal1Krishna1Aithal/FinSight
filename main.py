@@ -13,6 +13,7 @@ from core.ai_services.coa_mapper import CoAMapper, CONFIDENCE_THRESHOLD
 from core.db.session import init_db
 from core.db.operations import upsert_transactions
 from core.ai_services.insights_generator import InsightsGenerator
+from core.processors.analysis_engine import FrontendDataEngine
 import argparse
 
 
@@ -30,6 +31,7 @@ PDF_PATH   = args.pdf
 OUT_DIR    = os.path.join("data", "output")
 EXCEL_PATH = os.path.join(OUT_DIR, "clean_statement.xlsx")
 TALLY_PATH = os.path.join(OUT_DIR, "tally_import.csv")
+TALLY_XML_PATH = os.path.join(OUT_DIR, "tally_import.xml")
 INSIGHTS_PATH = os.path.join(OUT_DIR, "financial_insights.md")
 
 
@@ -276,7 +278,59 @@ def _save_tally_csv(df: pd.DataFrame, path: str) -> None:
     tally = tally.rename(columns={"Clean_Description": "Ledger_Name"})
     tally = tally[["Date", "Voucher_Type", "Ledger_Name", "CoA_Category", "Amount"]]
     tally.to_csv(path, index=False)
-    print(f"      ✅  Tally  → {path}")
+    print(f"      ✅  Tally CSV → {path}")
+
+
+def _save_tally_xml(df: pd.DataFrame, path: str) -> None:
+    """
+    Tally-ready exact XML structure for 1-click voucher import.
+    """
+    import xml.etree.ElementTree as ET
+    from xml.dom import minidom
+    
+    envelope = ET.Element("ENVELOPE")
+    header = ET.SubElement(envelope, "HEADER")
+    ET.SubElement(header, "TALLYREQUEST").text = "Import Data"
+    
+    body = ET.SubElement(envelope, "BODY")
+    importdata = ET.SubElement(body, "IMPORTDATA")
+    
+    reqdesc = ET.SubElement(importdata, "REQUESTDESC")
+    ET.SubElement(reqdesc, "REPORTNAME").text = "Vouchers"
+    staticvars = ET.SubElement(reqdesc, "STATICVARIABLES")
+    ET.SubElement(staticvars, "SVCURRENTCOMPANY").text = "My Company"
+    
+    reqdata = ET.SubElement(importdata, "REQUESTDATA")
+    
+    for _, row in df.iterrows():
+        if row["Debit"] == 0 and row["Credit"] == 0:
+            continue
+            
+        tmsg = ET.SubElement(reqdata, "TALLYMESSAGE", {"xmlns:UDF": "TallyUDF"})
+        vchtype = "Payment" if row["Debit"] > 0 else "Receipt"
+        amt = row["Debit"] if row["Debit"] > 0 else row["Credit"]
+        
+        voucher = ET.SubElement(tmsg, "VOUCHER", {"VCHTYPE": vchtype, "ACTION": "Create"})
+        ET.SubElement(voucher, "DATE").text = row["Date"].strftime("%Y%m%d")
+        ET.SubElement(voucher, "VOUCHERTYPENAME").text = vchtype
+        ET.SubElement(voucher, "NARRATION").text = str(row.get("Clean_Description", ""))
+        
+        # Party Ledger (The vendor / sender)
+        party_list = ET.SubElement(voucher, "ALLLEDGERENTRIES.LIST")
+        ET.SubElement(party_list, "LEDGERNAME").text = str(row.get("Clean_Description", ""))
+        ET.SubElement(party_list, "ISDEEMEDPOSITIVE").text = "Yes" if vchtype == "Payment" else "No"
+        ET.SubElement(party_list, "AMOUNT").text = f"-{amt}" if vchtype == "Payment" else f"{amt}"
+        
+        # Bank Ledger
+        bank_list = ET.SubElement(voucher, "ALLLEDGERENTRIES.LIST")
+        ET.SubElement(bank_list, "LEDGERNAME").text = "HDFC Bank"
+        ET.SubElement(bank_list, "ISDEEMEDPOSITIVE").text = "No" if vchtype == "Payment" else "Yes"
+        ET.SubElement(bank_list, "AMOUNT").text = f"{amt}" if vchtype == "Payment" else f"-{amt}"
+
+    xml_str = minidom.parseString(ET.tostring(envelope)).toprettyxml(indent="  ")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(xml_str)
+    print(f"      ✅  Tally XML → {path}")
 
 
 # ---------------------------------------------------------------------------
@@ -384,6 +438,7 @@ def run_pipeline() -> None:
     print("\n[5/6] Writing output files and updating database...")
     _save_excel(safe_df, EXCEL_PATH)
     _save_tally_csv(safe_df, TALLY_PATH)
+    _save_tally_xml(safe_df, TALLY_XML_PATH)
 
     new_rows = upsert_transactions(safe_df)
     print(f"      ✅  Database → Inserted {new_rows} new transactions.")
@@ -395,6 +450,14 @@ def run_pipeline() -> None:
         generator.generate_insights(INSIGHTS_PATH)
     except Exception as e:
         print(f"      [Insights] Initialization failed: {e}")
+
+    # ── Step 7: Frontend Data Export ─────────────────────────────────────
+    print("\n[7/7] Generating frontend API json...")
+    try:
+        fe_engine = FrontendDataEngine()
+        fe_engine.generate()
+    except Exception as e:
+        print(f"      [FrontendDataEngine] Initialization failed: {e}")
 
     # ── Terminal summary ─────────────────────────────────────────────────
     review_count = int(
