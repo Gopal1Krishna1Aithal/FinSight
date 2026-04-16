@@ -1,9 +1,6 @@
 import os
-import pandas as pd
 from typing import Optional
-from groq import Groq
-
-from core.db.session import SessionLocal, engine
+from core.db.session import SessionLocal, get_engine
 from core.db.models import Transaction
 
 
@@ -14,6 +11,7 @@ class InsightsGenerator:
     """
 
     def __init__(self, api_key: Optional[str] = None):
+        from groq import Groq
         self.api_key = api_key or os.getenv("GROQ_API_KEY")
         if not self.api_key:
             raise ValueError(
@@ -22,8 +20,9 @@ class InsightsGenerator:
         self.client = Groq(api_key=self.api_key)
 
     def generate_insights(
-        self, output_path: str, df: Optional[pd.DataFrame] = None
+        self, output_path: str, df: Optional[object] = None
     ) -> bool:
+        import pandas as pd
         """
         Reads transactions, aggregates them, and asks the LLM
         for business insights. Saves the result to a markdown file.
@@ -31,6 +30,7 @@ class InsightsGenerator:
         """
         if df is None:
             # Fallback to historic data if no specific dataframe passed
+            engine = get_engine()
             query = "SELECT * FROM transactions"
             try:
                 df = pd.read_sql_query(query, engine)
@@ -147,7 +147,7 @@ Style Guidelines:
 """
         try:
             response = self.client.chat.completions.create(
-                model="llama-3.1-8b-instant",
+                model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,  # Low temp for analytical text
                 max_tokens=1500,

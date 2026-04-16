@@ -25,9 +25,6 @@ import re
 import time
 from pathlib import Path
 
-import pandas as pd
-from groq import Groq
-
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -281,7 +278,7 @@ def _validate_entry(key: str, entry, valid_names: set) -> dict:
 
 
 def _call_groq(
-    client: Groq,
+    client: "Groq",
     descriptions: list[str],
     category_block: str,
     categories: list[dict],
@@ -378,6 +375,7 @@ class CoAMapper:
     """
 
     def __init__(self, api_key: str):
+        from groq import Groq
         if not api_key:
             raise ValueError(
                 "GROQ_API_KEY is not set. Add it to your .env file:\n"
@@ -388,7 +386,8 @@ class CoAMapper:
         self.category_block = _build_category_block(self.categories)
         self.cache = _load_cache()
 
-    def map(self, df: pd.DataFrame) -> pd.DataFrame:
+    def map(self, df: pd.DataFrame if "pd" in globals() else object) -> object:
+        import pandas as pd
         df = df.copy()
 
         # ── Startup-Tier Hybrid Optimization: Deterministic First ───────

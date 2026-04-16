@@ -1108,5 +1108,780 @@
     "category": "Bank Charges & Fees",
     "confidence": 100,
     "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "BULK NEFT SALARY APR 2023 PRANAV MEHTA Rs 95K | BNEFT23040703 SNEHA IYER Rs 88K ROHAN DESAI Rs 72K | ANANYA SINGH Rs 68 5K": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "MAKEMYTRIP BIZ FLIGHT BLR HYD TEAM IMPS230414009 OFFSITE": {
+    "category": "Travel & Transport",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'UBER|OLA\\s*CABS|IRCTC|TRAVEL|INDIGO|AIR\\s*INDIA|VISTARA|MAKEMYTRIP|MMT' matched."
+  },
+  "RTGS HDFC0008901 INFOSEC SOLUTIONS CYBER RTGS230422012 SECURITY AUDIT FEES": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY230425 CARD STMT APR": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "NEFT AXIS0004567 FINTAX ADVISORY PROFESSIONAL NEFT230428013 FEES Q1 FY24": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000001": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "BULK NEFT SALARY MAY 2023 4 EMPLOYEES — SAME BNEFT23050516 STRUCTURE AS APR": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "NEFT SBIN0007654 ADVANCE TAX Q1 AY 2024 25 NEFT230518020 CHALLAN NO 280": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY230525 CARD STMT MAY": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000002": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "BULK NEFT SALARY JUN 2023 4 EMPLOYEES BNEFT23060626 PROCESSED LIMITED": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY230622 CARD STMT JUN": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000003 LIMITED": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT230403001 RENT APR 2023": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS GCP RTGS230405002 VENDOR BILL APR": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS GCP vendor bill payment"
+  },
+  "RTGS HDFC0004365 NEXGEN SOFTWARE LLP CLIENT RTGS230410007 PROJECT ADVANCE RECD": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Project advance received from Nexgen Software LLP"
+  },
+  "NEFT ICIC0009876 DIGITAL SPARK MEDIA MARKETING NEFT230412008 CAMPAIGN APR Q1": {
+    "category": "E-Commerce & Retail",
+    "confidence": 70,
+    "reasoning": "Digital marketing campaign payment"
+  },
+  "NEFT HDFC0005678 SOFTLICENCE HUB MICROSOFT 365 NEFT230417010 ANNUAL RENEWAL": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Annual Microsoft 365 license renewal"
+  },
+  "NEFT SBIN0007654 GST PAYMENT APR 23 GSTN: NEFT230420011 27AABCA1234B1Z5": {
+    "category": "Interest & Dividends",
+    "confidence": 70,
+    "reasoning": "GST payment"
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT230503014 RENT MAY 2023 LIMITED": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE RTGS230505015 BILL APR CYCLE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS usage bill payment"
+  },
+  "RTGS HDFC0004365 NEXGEN SOFTWARE LLP PROJECT RTGS230510017 MILESTONE 1 PAYMENT": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Project milestone payment from Nexgen Software LLP"
+  },
+  "NEFT ICIC0009876 DIGITAL SPARK MEDIA SEO & NEFT230512018 CONTENT MARKETING MAY": {
+    "category": "E-Commerce & Retail",
+    "confidence": 70,
+    "reasoning": "Digital marketing campaign payment"
+  },
+  "OYO BUSINESS ACCOM HYDERABAD IMPS230515019 OFFSITE 3N 4D": {
+    "category": "Travel & Transport",
+    "confidence": 90,
+    "reasoning": "Business accommodation booking"
+  },
+  "NEFT HDFC0009012 ERGODESK SOLUTIONS OFFICE NEFT230520021 FURNITURE 12 UNITS": {
+    "category": "E-Commerce & Retail",
+    "confidence": 70,
+    "reasoning": "Furniture purchase"
+  },
+  "RTGS KOTAK0001122 NETPLUS ILINK LEASED LINE RTGS230522022 RENEWAL 1 YR": {
+    "category": "Utilities & Telecom",
+    "confidence": 70,
+    "reasoning": "Leased line renewal"
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT230602024 RENT JUN 2023": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE RTGS230605025 BILL MAY CYCLE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS usage bill payment"
+  },
+  "RTGS HDFC0004365 NEXGEN SOFTWARE LLP Q1 RTGS230609027 PROJECT COMPLETION PAYMENT": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Project completion payment from Nexgen Software LLP"
+  },
+  "NEFT AXIS0007890 LINKEDIN INDIA RECRUITMENT ADS NEFT230612028 JUN CAMPAIGN": {
+    "category": "E-Commerce & Retail",
+    "confidence": 70,
+    "reasoning": "LinkedIn recruitment ads payment"
+  },
+  "CLEARTRIP BIZ FLT MUM DEL MUM IMPS230614029 SALES TEAM": {
+    "category": "Travel & Transport",
+    "confidence": 90,
+    "reasoning": "Business flight booking"
+  },
+  "NEFT SBIN0007654 GST PAYMENT JUN 23 GSTN: NEFT230616030 27AABCA1234B1Z5": {
+    "category": "Interest & Dividends",
+    "confidence": 70,
+    "reasoning": "GST payment"
+  },
+  "NEFT HDFC0003456 ZENDESK INDIA SUPPORT TOOL NEFT230619031 ANNUAL LICENSE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Annual Zendesk license"
+  },
+  "NEFT HDFC0001234 ELECBILL MSEDCL ELECTRICITY BILL NEFT230628033 JUN 2023": {
+    "category": "Utilities & Telecom",
+    "confidence": 95,
+    "reasoning": "Electricity bill payment via NEFT transaction"
+  },
+  "BULK NEFT SALARY JUL 2023 5 EMPLOYEES (NEW HIRE: BNEFT23070703 VIKRAM RAO Rs 82K)": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "INDIGO AIRLINES BIZ FLT MUM BLR 4 IMPS230720008 PAX TECH SUMMIT": {
+    "category": "Travel & Transport",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'UBER|OLA\\s*CABS|IRCTC|TRAVEL|INDIGO|AIR\\s*INDIA|VISTARA|MAKEMYTRIP|MMT' matched."
+  },
+  "NEFT HDFC0009876 NASSCOM INDIA ANNUAL NEFT230722009 MEMBERSHIP FEES FY24": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY230725 CARD STMT JUL": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000004": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "BULK NEFT SALARY AUG 2023 5 EMPLOYEES BNEFT23080713 PROCESSED": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY230825 CARD STMT AUG": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000005": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "BULK NEFT SALARY SEP 2023 5 EMPLOYEES BNEFT23090722 PROCESSED LIMITED": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "NEFT SBIN0007654 ADVANCE TAX Q2 AY 2024 25 NEFT230915025 CHALLAN NO 280": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY230925 CARD STMT SEP": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000006 LIMITED": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT230703001 RENT JUL 2023": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP for rent"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE RTGS230705002 BILL JUN CYCLE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS usage bill payment from Cloudinfra Services"
+  },
+  "RTGS HDFC0004365 NEXGEN SOFTWARE LLP NEW RTGS230710004 PROJECT KICKOFF ADVANCE": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Advance salary payment to Nexgen Software LLP for project kickoff"
+  },
+  "NEFT ICIC0009876 DIGITAL SPARK MEDIA GOOGLE ADS NEFT230712005 MANAGEMENT JUL": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Google Ads payment from Digital Spark Media for management"
+  },
+  "NEFT HDFC0005432 AWS INDIA PVT LTD RESERVED NEFT230714006 INSTANCE PURCHASE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS instance purchase from AWS India Pvt Ltd"
+  },
+  "NEFT SBIN0007654 GST PAYMENT JUL 23 GSTN: NEFT230718007 27AABCA1234B1Z5": {
+    "category": "Interest & Dividends",
+    "confidence": 90,
+    "reasoning": "GST payment to SBI for July 2023"
+  },
+  "NEFT HDFC0001234 ELECBILL MSEDCL ELECTRICITY BILL NEFT230728010 JUL 2023": {
+    "category": "Utilities & Telecom",
+    "confidence": 90,
+    "reasoning": "Electricity bill payment to MSEDCL for July 2023"
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT230802011 RENT AUG 2023 LIMITED": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP for rent"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE RTGS230805012 BILL JUL CYCLE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS usage bill payment from Cloudinfra Services"
+  },
+  "RTGS HDFC0004365 INFOZEAL TECH INC CLIENT RTGS230810014 PAYMENT RECD USD 45K": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Payment received from Infozeal Tech Inc in USD"
+  },
+  "NEFT ICIC0009876 DIGITAL SPARK MEDIA SEO & SOCIAL NEFT230812015 MEDIA AUG": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "SEO and social media payment from Digital Spark Media for August"
+  },
+  "NEFT HDFC0002345 EPISODE SIX TECH SAAS TOOL NEFT230815016 ANNUAL CONTRACT": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Annual contract payment to Episode Six Tech for SaaS tool"
+  },
+  "NEFT SBIN0007654 GST PAYMENT AUG 23 GSTN: NEFT230818017 27AABCA1234B1Z5": {
+    "category": "Interest & Dividends",
+    "confidence": 90,
+    "reasoning": "GST payment to SBI for August 2023"
+  },
+  "TAJ HOTELS BUSINESS ACCOM PUNE 2N IMPS230820018 CLIENT MEETING": {
+    "category": "Travel & Transport",
+    "confidence": 90,
+    "reasoning": "Business accommodation payment to TAJ Hotels for client meeting"
+  },
+  "NEFT AXIS0006789 BRAND ELEVATE CO EXPO BOOTH NEFT230822019 DESIGN & BRANDING": {
+    "category": "E-Commerce & Retail",
+    "confidence": 90,
+    "reasoning": "Expo booth payment to Brand Elevate Co for design and branding"
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT230902020 RENT SEP 2023": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP for rent"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE RTGS230905021 BILL AUG CYCLE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS usage bill payment from Cloudinfra Services"
+  },
+  "RTGS HDFC0004365 NEXGEN SOFTWARE LLP PROJECT RTGS230910023 PHASE 2 MILESTONE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Payment to Nexgen Software LLP for project milestone"
+  },
+  "NEFT AXIS0007890 LINKEDIN INDIA RECRUITMENT ADS NEFT230912024 SEP CAMPAIGN": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Recruitment ads payment to LinkedIn India for September campaign"
+  },
+  "CLEARTRIP BIZ FLT MUM CHN 3 PAX IMPS230918026 ANNUAL REVIEW": {
+    "category": "Travel & Transport",
+    "confidence": 90,
+    "reasoning": "Business flight payment to Cleartrip for annual review"
+  },
+  "NEFT HDFC0001234 ELECBILL MSEDCL ELECTRICITY BILL NEFT230922027 SEP 2023": {
+    "category": "Utilities & Telecom",
+    "confidence": 95,
+    "reasoning": "Electricity bill payment via NEFT transaction"
+  },
+  "NEFT HDFC0009012 PRIMECAB CORPORATE CAB NEFT230928028 SERVICES Q2 — STAFF": {
+    "category": "Travel & Transport",
+    "confidence": 90,
+    "reasoning": "Corporate cab services payment via NEFT transaction"
+  },
+  "BULK NEFT SALARY OCT 2023 5 EMPLOYEES + DIWALI BNEFT23100703 BONUS Rs 50K EACH": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY231025 CARD STMT OCT": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000007": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "BULK NEFT SALARY NOV 2023 6 EMPLOYEES (NEW HIRE BNEFT23110713 ADDED)": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY231125 CARD STMT NOV": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000008": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "BULK NEFT SALARY DEC 2023 6 EMPLOYEES BNEFT23120722 PROCESSED LIMITED": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "NEFT SBIN0007654 ADVANCE TAX Q3 AY 2024 25 NEFT231215025 CHALLAN NO 280": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY231225 CARD STMT DEC": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000009 LIMITED": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT231002001 RENT OCT 2023": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP for office rent"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE RTGS231004002 BILL SEP CYCLE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS usage bill payment from Cloudinfra Services"
+  },
+  "RTGS HDFC0004365 NEXGEN SOFTWARE LLP AMD RTGS231010004 PAYMENT RECD — OCT INVOICE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Payment received from Nexgen Software LLP for AMD services"
+  },
+  "NEFT ICIC0009876 DIGITAL SPARK MEDIA DIWALI NEFT231012005 CAMPAIGN OCT NOV": {
+    "category": "E-Commerce & Retail",
+    "confidence": 70,
+    "reasoning": "Digital Spark Media's Diwali campaign payment, likely for online ads"
+  },
+  "MARRIOTT HOTELS BIZ ACCOM TEAM IMPS231014006 RETREAT GOA 3D": {
+    "category": "Travel & Transport",
+    "confidence": 90,
+    "reasoning": "Business accommodation team retreat at Marriott Hotels in Goa"
+  },
+  "NEFT HDFC0005678 JIRA ATLASSIAN DEV TOOL ANNUAL NEFT231016007 RENEWAL": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Annual renewal of Jira Atlassian development tool"
+  },
+  "NEFT SBIN0007654 GST PAYMENT OCT 23 GSTN: NEFT231018008 27AABCA1234B1Z5": {
+    "category": "Interest & Dividends",
+    "confidence": 70,
+    "reasoning": "GST payment, likely a refund or credit"
+  },
+  "NEFT HDFC0009012 INFRATECH MAINT SERVER ROOM NEFT231020009 AMC FY24 RENEWAL": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Annual maintenance contract renewal for server room from Infratech"
+  },
+  "NEFT HDFC0001234 ELECBILL MSEDCL ELECTRICITY BILL NEFT231028010 OCT 2023": {
+    "category": "Utilities & Telecom",
+    "confidence": 90,
+    "reasoning": "Electricity bill payment from MSEDCL"
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT231102011 RENT NOV 2023 LIMITED": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP for office rent"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE RTGS231104012 BILL OCT CYCLE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS usage bill payment from Cloudinfra Services"
+  },
+  "RTGS HDFC0004365 INFOZEAL TECH INC NOV RETAINER RTGS231109014 PAYMENT RECD": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Payment received from Infozeal Tech Inc for retainer services"
+  },
+  "NEFT AXIS0007890 LINKEDIN INDIA RECRUITMENT ADS NEFT231112015 NOV CAMPAIGN": {
+    "category": "E-Commerce & Retail",
+    "confidence": 70,
+    "reasoning": "LinkedIn India recruitment ads payment, likely for online ads"
+  },
+  "NEFT HDFC0002345 HUBSPOT INDIA CRM PLATFORM NEFT231114016 ANNUAL LICENSE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Annual license renewal for Hubspot CRM platform"
+  },
+  "SPICE JET BUSINESS FLT MUM DEL IMPS231116017 BUSINESS REVIEW MTG": {
+    "category": "Travel & Transport",
+    "confidence": 90,
+    "reasoning": "Business flight from Mumbai to Delhi with SpiceJet"
+  },
+  "NEFT SBIN0007654 GST PAYMENT NOV 23 GSTN: NEFT231118018 27AABCA1234B1Z5": {
+    "category": "Interest & Dividends",
+    "confidence": 70,
+    "reasoning": "GST payment, likely a refund or credit"
+  },
+  "NEFT HDFC0006789 FRESHWORKS INDIA HELP DESK NEFT231120019 TOOL ANNUAL PLAN": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Annual plan renewal for Freshworks India help desk tool"
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT231202020 RENT DEC 2023": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP for office rent"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE RTGS231204021 BILL NOV CYCLE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS usage bill payment from Cloudinfra Services"
+  },
+  "RTGS HDFC0004365 NEXGEN SOFTWARE LLP YEAR END RTGS231210023 PROJECT PAYMENT RECD": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Payment received from Nexgen Software LLP for year-end project"
+  },
+  "NEFT AXIS0001234 PR NEWSWIRE INDIA PRESS RELEASE NEFT231212024 ANNUAL PACKAGE": {
+    "category": "E-Commerce & Retail",
+    "confidence": 70,
+    "reasoning": "Payment for annual package from news release service"
+  },
+  "NEFT HDFC0007890 OFFICESPACE RENO PARTITION & NEFT231218026 INTERIORS PHASE 2": {
+    "category": "Fuel & Auto",
+    "confidence": 80,
+    "reasoning": "Payment for office space renovation and interior work"
+  },
+  "THOMAS COOK BIZ ANNUAL TEAM IMPS231220027 OFFSITE PACKAGE": {
+    "category": "Travel & Transport",
+    "confidence": 90,
+    "reasoning": "Annual team offsite package booking with Thomas Cook"
+  },
+  "NEFT HDFC0001234 ELECBILL MSEDCL ELECTRICITY BILL NEFT231222028 DEC 2023": {
+    "category": "Utilities & Telecom",
+    "confidence": 95,
+    "reasoning": "Electricity bill payment for December 2023"
+  },
+  "BULK NEFT SALARY JAN 2024 6 EMP — POST APPRAISAL BNEFT24010703 REVISED CTCS": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "AIR INDIA BUSINESS FLT MUM SIN TECH IMPS240116007 SUMMIT 2 PAX": {
+    "category": "Travel & Transport",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'UBER|OLA\\s*CABS|IRCTC|TRAVEL|INDIGO|AIR\\s*INDIA|VISTARA|MAKEMYTRIP|MMT' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY240125 CARD STMT JAN": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000010 LIMITED": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "BULK NEFT SALARY FEB 2024 6 EMPLOYEES BNEFT24020714 PROCESSED": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "NEFT HDFC0007654 ERNST & YOUNG LLP STATUTORY NEFT240220020 AUDIT FEES FY24": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY240225 CARD STMT FEB": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000011": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "BULK NEFT SALARY MAR 2024 6 EMPLOYEES + BNEFT24030723 PERFORMANCE BONUS": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "NEFT SBIN0007654 ADVANCE TAX Q4 AY 2024 25 FINAL NEFT240314026 INSTALMENT": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "NEFT HDFC0007654 FINTAX ADVISORY ROC FILING + NEFT240322030 COMPLIANCE FY24": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "CREDIT CARD AUTOPAY TAD CORPORATE AUTOPAY240325 CARD STMT MAR": {
+    "category": "Credit Card Repayment",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CC\\s*AUTOPAY|SI-TAD|SI-MAD|CREDIT\\s*CARD' matched."
+  },
+  "CREDIT INTEREST CAPITALISED CI0000000012 LIMITED": {
+    "category": "Interest & Dividends",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'INTEREST|INT-' matched."
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT240102001 RENT JAN 2024": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP for rent"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE RTGS240104002 BILL DEC CYCLE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS usage bill payment from Cloudinfra Services"
+  },
+  "RTGS HDFC0004365 NEXGEN SOFTWARE LLP Q4 NEW RTGS240110004 PROJECT ADVANCE RECD": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Payroll payment from Nexgen Software LLP for project advance"
+  },
+  "NEFT ICIC0009876 DIGITAL SPARK MEDIA Q4 DIGITAL NEFT240112005 MARKETING RETAINER": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Digital marketing retainer payment from Digital Spark Media"
+  },
+  "NEFT HDFC0005678 GITHUB ENTERPRISE ANNUAL DEV NEFT240114006 LICENCES — 20 SEATS": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "GitHub enterprise annual development licenses purchase"
+  },
+  "NEFT SBIN0007654 GST PAYMENT JAN 24 GSTN: NEFT240118008 27AABCA1234B1Z5": {
+    "category": "Interest & Dividends",
+    "confidence": 90,
+    "reasoning": "GST payment from SBI"
+  },
+  "NEFT HDFC0009876 DELL INDIA 20 LAPTOP REFRESH Q4 NEFT240120009 CAPEX": {
+    "category": "Fuel & Auto",
+    "confidence": 90,
+    "reasoning": "Laptop purchase from Dell India for capex"
+  },
+  "RTGS KOTAK0001122 NETPLUS ILINK INTERNET NEFT240122010 BANDWIDTH UPGRADE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Internet bandwidth upgrade payment from Netplus Ilink"
+  },
+  "NEFT HDFC0001234 ELECBILL MSEDCL ELECTRICITY BILL NEFT240128011 JAN 2024": {
+    "category": "Utilities & Telecom",
+    "confidence": 90,
+    "reasoning": "Electricity bill payment from MSEDCL"
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT240202012 RENT FEB 2024": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP for rent"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE RTGS240204013 BILL JAN CYCLE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS usage bill payment from Cloudinfra Services"
+  },
+  "RTGS HDFC0004365 INFOZEAL TECH INC FEB RETAINER RTGS240209015 + MILESTONE RECD": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "Digital marketing retainer payment from Infozeal Tech Inc"
+  },
+  "NEFT AXIS0007890 LINKEDIN INDIA RECRUITMENT DRIVE NEFT240212016 FEB MAR": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "LinkedIn India recruitment drive payment"
+  },
+  "NEFT HDFC0003456 DATADOG INC INFRA MONITORING NEFT240214017 ANNUAL PLAN": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "DataDog Inc infrastructure monitoring annual plan purchase"
+  },
+  "HYATT HOTELS BIZ ACCOM PUNE IMPS240216018 CLIENT PRESENTATION": {
+    "category": "Travel & Transport",
+    "confidence": 90,
+    "reasoning": "Business accommodation payment at Hyatt Hotels Pune"
+  },
+  "NEFT SBIN0007654 GST PAYMENT FEB 24 GSTN: NEFT240218019 27AABCA1234B1Z5": {
+    "category": "Interest & Dividends",
+    "confidence": 90,
+    "reasoning": "GST payment from SBI"
+  },
+  "NEFT HDFC0000234 TECHPARK ESTATES LLP OFFICE NEFT240302021 RENT MAR 2024": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Salary credit from Techpark Estates LLP for rent"
+  },
+  "RTGS ICIC0000567 CLOUDINFRA SERVICES AWS USAGE RTGS240304022 BILL FEB CYCLE LIMITED": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "AWS usage bill payment from Cloudinfra Services"
+  },
+  "RTGS HDFC0004365 NEXGEN SOFTWARE LLP FINAL RTGS240310024 PROJECT SETTLEMENT RECD": {
+    "category": "Payroll",
+    "confidence": 90,
+    "reasoning": "Payroll payment from Nexgen Software LLP for project settlement"
+  },
+  "NEFT AXIS0001234 PR NEWSWIRE INDIA ANNUAL NEFT240312025 REPORT PR PACKAGE": {
+    "category": "Software & IT",
+    "confidence": 90,
+    "reasoning": "PR news wire India annual report purchase"
+  },
+  "NEFT HDFC0009012 SOFTLICENCE HUB ADOBE NEFT240316027 CREATIVE CLOUD 10 SEATS": {
+    "category": "Software & IT",
+    "confidence": 95,
+    "reasoning": "Software subscription payment for Adobe Creative Cloud"
+  },
+  "MAKE MY TRIP BIZ FLT MUM DEL IMPS240318028 ANNUAL CONF 3 PAX": {
+    "category": "Travel & Transport",
+    "confidence": 90,
+    "reasoning": "Flight booking payment for MakeMyTrip business travel"
+  },
+  "NEFT HDFC0001234 ELECBILL MSEDCL ELECTRICITY BILL NEFT240320029 MAR 2024": {
+    "category": "Utilities & Telecom",
+    "confidence": 98,
+    "reasoning": "Electricity bill payment to MSEDCL via NEFT"
+  },
+  "Payroll Deposit HOTEL": {
+    "category": "Payroll",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'SALARY|PAYROLL|PAY\\s*ROLL|SAL-' matched."
+  },
+  "ATM Withdrawal INTERAC": {
+    "category": "ATM Withdrawal",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'ATM\\s*WITHDRAWAL|NWD-|EAW-|ATW-' matched."
+  },
+  "Fees Interac": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "ATM Withdrawal FIRST BANK": {
+    "category": "ATM Withdrawal",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'ATM\\s*WITHDRAWAL|NWD-|EAW-|ATW-' matched."
+  },
+  "Web Funds Transfer From SAVINGS": {
+    "category": "IMPS Transfer",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'IMPS-|NEFT-|RTGS-|TRANSFER' matched."
+  },
+  "Fees Overdraft": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "Fees Monthly": {
+    "category": "Bank Charges & Fees",
+    "confidence": 100,
+    "reasoning": "Deterministic match: Pattern 'CHG|FEES|SERVICE\\s*CHG|FINE|GST-|TAX|INT-' matched."
+  },
+  "Previous balance": {
+    "category": "Uncategorized",
+    "confidence": 0,
+    "reasoning": "No transaction type information available"
+  },
+  "Web Bill Payment MASTERCARD": {
+    "category": "Bank Charges & Fees",
+    "confidence": 90,
+    "reasoning": "Payment to credit card company indicates bank fee"
+  },
+  "Interac Purchase ELECTRONICS": {
+    "category": "E-Commerce & Retail",
+    "confidence": 90,
+    "reasoning": "Interac transaction with electronics store indicates retail purchase"
+  },
+  "Web Bill Payment AMEX": {
+    "category": "Bank Charges & Fees",
+    "confidence": 90,
+    "reasoning": "Payment to credit card company indicates bank fee"
+  },
+  "Interac Purchase SUPERMARKET": {
+    "category": "E-Commerce & Retail",
+    "confidence": 90,
+    "reasoning": "Interac transaction with supermarket indicates retail purchase"
+  },
+  "Interac Refund ELECTRONICS": {
+    "category": "E-Commerce & Retail",
+    "confidence": 90,
+    "reasoning": "Interac refund from electronics store indicates retail transaction"
+  },
+  "Telephone Bill Payment VISA": {
+    "category": "Utilities & Telecom",
+    "confidence": 90,
+    "reasoning": "Payment to telecom company indicates utility bill"
+  },
+  "Pre Auth Payment INSURANCE": {
+    "category": "Uncategorized",
+    "confidence": 0,
+    "reasoning": "No clear transaction type information available"
+  },
+  "Cheque No 409": {
+    "category": "Uncategorized",
+    "confidence": 0,
+    "reasoning": "No clear transaction type information available"
+  },
+  "Mortgage Payment": {
+    "category": "Loan & EMI",
+    "confidence": 90,
+    "reasoning": "Payment to mortgage company indicates loan repayment"
   }
 }

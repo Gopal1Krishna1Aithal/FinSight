@@ -37,10 +37,12 @@ const UploadSection = ({ onResults, onLoading }) => {
         formData.append('file', f);
       });
 
+      console.log('Ingestion: Sending request to backend...', { filesCount: files.length });
       const res = await fetch('http://127.0.0.1:8000/api/upload/', {
         method: 'POST',
         body: formData,
       });
+      console.log('Ingestion: Received response', { status: res.status });
 
       // Always try to parse as JSON; fall back gracefully if the server returned HTML
       const text = await res.text();

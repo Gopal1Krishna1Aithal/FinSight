@@ -1,40 +1,49 @@
 import os
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 
-from core.db.models import Base
+# Database path (lazily resolved)
+def _get_db_config():
+    out_dir = os.path.join("data", "output")
+    db_path = os.path.join(out_dir, "finsight.db")
+    return out_dir, f"sqlite:///{db_path}"
 
-# Database path
-OUT_DIR = os.path.join("data", "output")
-os.makedirs(OUT_DIR, exist_ok=True)
-DB_PATH      = os.path.join(OUT_DIR, "finsight.db")
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+# Global engine/session cache
+_ENGINE = None
+_SESSION_FACTORY = None
 
-engine       = create_engine(
-    DATABASE_URL, 
-    echo=False, 
-    connect_args={"timeout": 30}
-)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+def get_engine():
+    global _ENGINE
+    if _ENGINE is None:
+        from sqlalchemy import create_engine
+        out_dir, db_url = _get_db_config()
+        # Only create directory when we actually need the engine
+        os.makedirs(out_dir, exist_ok=True)
+        _ENGINE = create_engine(
+            db_url, 
+            echo=False, 
+            connect_args={"timeout": 30}
+        )
+    return _ENGINE
 
+def SessionLocal():
+    global _SESSION_FACTORY
+    if _SESSION_FACTORY is None:
+        from sqlalchemy.orm import sessionmaker
+        engine = get_engine()
+        _SESSION_FACTORY = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    return _SESSION_FACTORY()
 
 def _migrate_add_column(conn, column_def: str) -> None:
-    """
-    Safely add a column to the transactions table.
-    SQLite has no 'ADD COLUMN IF NOT EXISTS', so we catch OperationalError.
-    """
+    from sqlalchemy import text
     try:
         conn.execute(text(f"ALTER TABLE transactions ADD COLUMN {column_def}"))
         conn.commit()
     except Exception:
-        pass  # Column already exists — silently continue
-
+        pass
 
 def init_db() -> None:
-    """Create tables if they don't exist, then run additive migrations."""
+    from core.db.models import Base
+    engine = get_engine()
     Base.metadata.create_all(engine)
-
-    # Additive migration — zero data loss for existing 361 rows
     with engine.connect() as conn:
         _migrate_add_column(conn, "source_file  TEXT DEFAULT 'UNKNOWN'")
         _migrate_add_column(conn, "period_label TEXT DEFAULT 'FY2324'")

@@ -69,10 +69,10 @@ Be direct, professional, and helpful. Use Rupee (₹) for currency.
 AI Response:"""
 
             response = self.client.chat.completions.create(
-                model="llama-3.1-8b-instant",
+                model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
-                max_tokens=500,
+                max_tokens=512,
             )
             return response.choices[0].message.content.strip()
 

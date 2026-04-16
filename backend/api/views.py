@@ -4,27 +4,70 @@ import json
 import uuid
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import math
+import numpy as np
 
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from dotenv import load_dotenv
 
-# Load environment variables on startup
+# 1. Environment and Base imports
 load_dotenv()
+
+# Global cache for lazy imports to prevent repeated stall
+_LAZY_CACHE = {}
+
+def _get_pipeline_deps():
+    if not _LAZY_CACHE:
+        print("      → Warming up AI & Data engines for the first time...")
+        
+        print("        [1/8] Loading pandas...")
+        import pandas as pd
+        
+        print("        [2/8] Loading HDFCPDFExtractor...")
+        from core.extractors.hdfc_pdf import HDFCPDFExtractor
+        
+        print("        [3/8] Loading HDFCDataCleaner...")
+        from core.processors.cleaner import HDFCDataCleaner
+        
+        print("        [4/8] Loading DataSanitizer...")
+        from core.processors.sanitizer import DataSanitizer
+        
+        print("        [5/8] Loading CoAMapper...")
+        from core.ai_services.coa_mapper import CoAMapper
+        
+        print("        [6/8] Loading DB Session...")
+        from core.db.session import init_db
+        
+        print("        [7/8] Loading DB Ops...")
+        from core.db.operations import upsert_transactions
+        
+        print("        [8/8] Loading InsightsGenerator...")
+        from core.ai_services.insights_generator import InsightsGenerator
+        
+        _LAZY_CACHE.update({
+            "pd": pd,
+            "HDFCPDFExtractor": HDFCPDFExtractor,
+            "HDFCDataCleaner": HDFCDataCleaner,
+            "DataSanitizer": DataSanitizer,
+            "CoAMapper": CoAMapper,
+            "init_db": init_db,
+            "upsert_transactions": upsert_transactions,
+            "InsightsGenerator": InsightsGenerator
+        })
+        print("      ✅  Engines ready.")
+    return _LAZY_CACHE
 
 
 class _SafeEncoder(json.JSONEncoder):
     def default(self, obj):
-        import numpy as np
         if isinstance(obj, np.bool_):   return bool(obj)
         if isinstance(obj, np.integer): return int(obj)
         if isinstance(obj, np.floating): return float(obj)
         return super().default(obj)
 
 def _sanitize_data(obj):
-    import math
-    import numpy as np
     if isinstance(obj, dict):
         return {k: _sanitize_data(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -40,7 +83,6 @@ def _sanitize_data(obj):
 # ---------------------------------------------------------------------------
 
 def _save_tally_csv(df, path: str) -> None:
-    import pandas as pd
     tally = df[["Date", "Clean_Description", "CoA_Category", "Debit", "Credit"]].copy()
     tally["Date"] = df["Date"].dt.strftime("%d/%m/%Y")
     tally["Voucher_Type"] = tally.apply(lambda r: "Payment" if r["Debit"] > 0 else "Receipt", axis=1)
@@ -90,13 +132,6 @@ def _save_tally_xml(df, path: str) -> None:
 # ---------------------------------------------------------------------------
 
 def _validate_ledger_math(df):
-    """
-    Startup-Grade Integrity Layer:
-    Performs deterministic row-by-row balance verification.
-    If (Previous Balance - Debit + Credit) != Current Balance, flag the row.
-    This prevents 'silent hallucinations' from Gemini/OCR.
-    """
-    import pandas as pd
     df = df.sort_values(["Period", "Date"]).reset_index(drop=True)
     df["Math_Audit_Status"] = "VERIFIED"
     df["Math_Error_Flag"] = False
@@ -305,7 +340,7 @@ def _compute_metrics(df) -> dict:
 
 # ── Multi-period helpers (mirrored from main.py) ───────────────────────────
 _QUARTER_LABELS = {"Q1": "Apr–Jun", "Q2": "Jul–Sep", "Q3": "Oct–Dec", "Q4": "Jan–Mar"}
-_FY_LABELS = {"FY2324": "23", "FY2425": "24", "FY2526": "25"}
+_FY_LABELS      = {"FY2324": "23", "FY2425": "24", "FY2526": "25"}
 
 def _infer_period_label(filename: str, df) -> tuple[str, str]:
     import re
@@ -323,47 +358,54 @@ def _infer_period_label(filename: str, df) -> tuple[str, str]:
 
 
 def _run_pipeline(file_paths: list[str]) -> dict:
-    from dotenv import load_dotenv
-    load_dotenv()
-    import pandas as pd
-
-    from core.extractors.hdfc_pdf import HDFCPDFExtractor
-    from core.processors.cleaner import HDFCDataCleaner
-    from core.processors.sanitizer import DataSanitizer
-    from core.ai_services.coa_mapper import CoAMapper
-    from core.db.session import init_db
-    from core.db.operations import upsert_transactions
-    from core.ai_services.insights_generator import InsightsGenerator
-
+    """
+    Orchestrates the multi-stage extraction and processing pipeline.
+    Uses lazy-loading to ensure the server stays responsive on first run.
+    """
+    print(f"\n[1/5] Ingesting {len(file_paths)} statement(s)...")
+    deps = _get_pipeline_deps()
+    
     OUT_DIR       = os.path.join("data", "output")
     INSIGHTS_PATH = os.path.join(OUT_DIR, "financial_insights.md")
-    TALLY_CSV     = os.path.join(OUT_DIR, "tally_import.csv")
-    TALLY_XML     = os.path.join(OUT_DIR, "tally_import.xml")
+    TALLY_CSV     = os.path.join(OUT_DIR, "tally_export_v1.csv")
+    TALLY_XML     = os.path.join(OUT_DIR, "tally_export_v1.xml")
     os.makedirs(OUT_DIR, exist_ok=True)
 
     groq_api_key = os.getenv("GROQ_API_KEY")
     all_dfs = []
-    
+
     for f_path in file_paths:
         fname = os.path.basename(f_path)
+        print(f"      → Processing: {fname}")
+        
         # Extract
         if f_path.lower().endswith(".pdf"):
-            raw_data = HDFCPDFExtractor(f_path).extract() or []
+            print(f"        [Extractor] Running HDFCPDFExtractor...")
+            raw_data = deps["HDFCPDFExtractor"](f_path).extract() or []
         else:
+            print(f"        [Extractor] Running ImageOCRExtractor...")
             from core.extractors.image_ocr import ImageOCRExtractor
             raw_data = ImageOCRExtractor(image_paths=[f_path]).extract() or []
         
-        if not raw_data: continue
+        if not raw_data: 
+            print(f"        [!] No data extracted for {fname}.")
+            continue
+        print(f"        [Extractor] Done. Found {len(raw_data)} raw rows.")
 
         # Clean + Sanitize
-        clean_df = HDFCDataCleaner(raw_data).clean()
-        if clean_df.empty: continue
-        safe_df = DataSanitizer(clean_df).scrub_pii()
+        print(f"        [Processor] Cleaning & Sanitizing...")
+        clean_df = deps["HDFCDataCleaner"](raw_data).clean()
+        if clean_df.empty: 
+            print(f"        [!] Cleaning resulted in 0 rows.")
+            continue
+        safe_df = deps["DataSanitizer"](clean_df).scrub_pii()
 
         # CoA Mapping
         if groq_api_key:
-            safe_df = CoAMapper(api_key=groq_api_key).map(safe_df)
+            print(f"        [AI] Mapping to Chart of Accounts (Groq)...")
+            safe_df = deps["CoAMapper"](api_key=groq_api_key).map(safe_df)
         else:
+            print(f"        [AI] Skipping CoA Mapping (No API Key).")
             safe_df["CoA_Category"] = "Uncategorized"; safe_df["Confidence_Score"] = 0; safe_df["Reasoning"] = "No API Key"
 
         # Tag period
@@ -371,30 +413,34 @@ def _run_pipeline(file_paths: list[str]) -> dict:
         safe_df["Period"] = period_label
         
         # Upsert
-        upsert_transactions(safe_df, source_file=fname, period_label=period_label)
+        print(f"        [DB] Updating database...")
+        deps["upsert_transactions"](safe_df, source_file=fname, period_label=period_label)
         all_dfs.append(safe_df)
 
     if not all_dfs:
         return {"error": "Extraction failed for all files. Check formats or bank layout."}
 
-    # Consolidated DF for the response
-    combined_df = pd.concat(all_dfs, ignore_index=True)
+    combined_df = deps["pd"].concat(all_dfs, ignore_index=True)
     combined_df = combined_df.sort_values(["Period", "Date"]).reset_index(drop=True)
 
-    # ── Startup Optimization: Deterministic Integrity Audit ───────────
+    # ── Deterministic Integrity Audit ───────────
+    print("\n[2/5] Performing mathematical integrity audit...")
     combined_df = _validate_ledger_math(combined_df)
 
-    # Save tally exports (cumulative for this session)
+    # Save tally exports
+    print("[3/5] Generating Tally export formats (CSV/XML)...")
     try:
         _save_tally_csv(combined_df, TALLY_CSV)
         _save_tally_xml(combined_df, TALLY_XML)
-    except Exception as e: print(f"[Tally Export] Warning: {e}")
+    except Exception as e: print(f"      [Tally Export] Warning: {e}")
 
-    # Generate insights (on the current upload only)
-    try: InsightsGenerator().generate_insights(INSIGHTS_PATH, df=combined_df)
-    except Exception as e: print(f"[Insights] Error: {e}")
+    # Generate insights
+    print("[4/5] Synthesizing professional financial insights (Groq)...")
+    try: deps["InsightsGenerator"]().generate_insights(INSIGHTS_PATH, df=combined_df)
+    except Exception as e: print(f"      [Insights] Error: {e}")
 
     # Compute metrics + period breakdown
+    print("[5/5] Compiling final dashboard metrics...")
     payload = _compute_metrics(combined_df)
     
     # Add period_breakdown for multi-period display
@@ -423,6 +469,7 @@ def _run_pipeline(file_paths: list[str]) -> dict:
 @require_http_methods(["POST"])
 def upload_statement(request):
     """POST /api/upload/ — accepts multiple files, runs batch pipeline, returns metrics."""
+    print("\n[DEBUG] upload_statement endpoint triggered.")
     if "file" not in request.FILES:
         return JsonResponse({"error": "No file provided."}, status=400)
 
